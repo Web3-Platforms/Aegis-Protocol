@@ -3,9 +3,17 @@ const path = require("node:path");
 const { ethers, network } = require("hardhat");
 
 async function main() {
-  const [deployer, aiOracle] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  if (signers.length === 0) {
+    throw new Error("No signers available. Check your private key and network configuration.");
+  }
+  
+  const deployer = signers[0];
+  const aiOracle = signers.length > 1 ? signers[1] : deployer; // Use deployer as aiOracle if only one signer
 
   console.log(`Deploying AegisVault to ${network.name}...`);
+  console.log(`Deployer: ${deployer.address}`);
+  console.log(`AI Oracle: ${aiOracle.address}`);
 
   const AegisVault = await ethers.getContractFactory("AegisVault");
   const vault = await AegisVault.deploy(deployer.address, aiOracle.address);
