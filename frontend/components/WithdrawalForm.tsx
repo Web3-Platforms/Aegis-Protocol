@@ -32,6 +32,8 @@ export function WithdrawalForm() {
     if (depositBalance) {
       const balance = Number(depositBalance) / Math.pow(10, selectedToken.decimals);
       setUserBalance(balance.toFixed(6));
+    } else {
+      setUserBalance("0");
     }
   }, [depositBalance, selectedToken]);
 
@@ -74,105 +76,128 @@ export function WithdrawalForm() {
 
   if (!isConnected) {
     return (
-      <div className="aegis-panel px-6 py-7 text-center">
-        <p className="text-base text-[var(--aegis-ink-muted)]">Connect your wallet to access withdrawal actions.</p>
+      <div className="aegis-panel p-8 text-center flex flex-col items-center justify-center space-y-4">
+        <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center text-xl">
+          🔓
+        </div>
+        <div>
+          <h3 className="font-bold text-lg">Wallet Not Connected</h3>
+          <p className="text-sm text-muted-foreground max-w-xs mx-auto">Please connect your wallet to manage your withdrawals and view your vault balance.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleWithdraw} className="aegis-panel space-y-5 px-6 py-7">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="aegis-metric-label">Outbound Flow</p>
-          <h2 className="mt-3 text-2xl font-semibold text-[var(--aegis-ink)]">Withdraw from the vault</h2>
-        </div>
-        <span className="aegis-chip">{selectedToken.symbol}</span>
+    <div className="aegis-panel overflow-hidden border-indigo-500/20">
+      <div className="bg-indigo-600 p-6 text-white">
+        <h2 className="text-xl font-bold tracking-tight">Withdraw Assets</h2>
+        <p className="text-sm opacity-80">Retrieve your capital from the yield vault</p>
       </div>
+      
+      <form onSubmit={handleWithdraw} className="p-6 space-y-6">
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Select Asset</label>
+          <div className="grid grid-cols-2 gap-2">
+            {SUPPORTED_TOKENS.map((token) => (
+              <button
+                key={token.address}
+                type="button"
+                onClick={() => setSelectedToken(token)}
+                className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                  selectedToken.address === token.address 
+                    ? "bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500" 
+                    : "bg-background border-input hover:bg-secondary/50"
+                }`}
+              >
+                <span className="text-xl">{token.icon}</span>
+                <span className="font-bold text-sm">{token.symbol}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-      <div>
-        <label className="mb-2 block text-sm font-semibold text-[var(--aegis-ink)]">Choose token</label>
-        <select
-          value={selectedToken.address}
-          onChange={(e) => {
-            const token = SUPPORTED_TOKENS.find((item) => item.address === e.target.value);
-            if (token) setSelectedToken(token);
-          }}
-          className="aegis-select"
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Amount</label>
+            <span className="text-xs font-bold text-indigo-600">Available: {userBalance} {selectedToken.symbol}</span>
+          </div>
+          <div className="relative">
+            <input
+              type="number"
+              value={withdrawAmount}
+              onChange={(e) => setWithdrawAmount(e.target.value)}
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+              max={userBalance}
+              className="aegis-input h-14 text-lg font-bold pr-16 border-indigo-200 focus-visible:ring-indigo-500"
+            />
+            <button 
+              type="button"
+              onClick={() => setWithdrawAmount(userBalance)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] font-bold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded uppercase tracking-tighter"
+            >
+              Max
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-indigo-50/50 border border-dashed border-indigo-200 space-y-2">
+          <div className="flex justify-between text-xs font-medium">
+            <span className="text-muted-foreground">Withdrawal Fee</span>
+            <span className="text-foreground font-bold">0.00%</span>
+          </div>
+          <div className="flex justify-between text-xs font-medium">
+            <span className="text-muted-foreground">Unlocking Period</span>
+            <span className="text-foreground font-bold">Instant (Paseo)</span>
+          </div>
+        </div>
+
+        {error && (
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium animate-shake">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-600 text-xs font-medium">
+            {success}
+          </div>
+        )}
+
+        {isSuccess && (
+          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-600 text-xs font-medium">
+            Withdrawal successful! Your assets have been returned to your wallet.
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={!withdrawAmount || isPending || isConfirming || Number(withdrawAmount) > Number(userBalance)}
+          className="aegis-button bg-indigo-600 text-white hover:bg-indigo-700 w-full h-12 text-base shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100"
         >
-          {SUPPORTED_TOKENS.map((token) => (
-            <option key={token.address} value={token.address}>
-              {token.icon} {token.symbol} - {token.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          {isPending ? (
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Processing...
+            </span>
+          ) : isConfirming ? (
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Confirming...
+            </span>
+          ) : (
+            "Withdraw Funds"
+          )}
+        </button>
 
-      <div className="aegis-panel-muted flex items-center justify-between gap-4 p-4">
-        <div>
-          <p className="text-sm font-medium text-[var(--aegis-ink)]">Available balance</p>
-          <p className="mt-1 text-2xl font-semibold text-[var(--aegis-brand-900)]">
-            {userBalance} {selectedToken.symbol}
-          </p>
-        </div>
-        <span className="aegis-badge aegis-badge-brand">Wallet-linked</span>
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-semibold text-[var(--aegis-ink)]">Amount ({selectedToken.symbol})</label>
-        <div className="flex gap-2">
-          <input
-            type="number"
-            value={withdrawAmount}
-            onChange={(e) => setWithdrawAmount(e.target.value)}
-            placeholder="0.00"
-            step="0.01"
-            min="0"
-            max={userBalance}
-            className="aegis-input"
-          />
-          <button
-            type="button"
-            onClick={() => setWithdrawAmount(userBalance)}
-            className="aegis-button aegis-button-secondary shrink-0"
-          >
-            Max
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div className="rounded-[20px] border border-[rgba(230,84,111,0.24)] bg-[rgba(230,84,111,0.08)] px-4 py-3 text-sm text-[#8f1f35]">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="rounded-[20px] border border-[rgba(49,196,122,0.24)] bg-[rgba(49,196,122,0.1)] px-4 py-3 text-sm text-[#14653d]">
-          {success}
-        </div>
-      )}
-
-      {isSuccess && (
-        <div className="rounded-[20px] border border-[rgba(49,196,122,0.24)] bg-[rgba(49,196,122,0.1)] px-4 py-3 text-sm text-[#14653d]">
-          Withdrawal successful.
-        </div>
-      )}
-
-      <button
-        type="submit"
-        disabled={!withdrawAmount || isPending || isConfirming || Number(withdrawAmount) > Number(userBalance)}
-        className="aegis-button aegis-button-primary w-full"
-      >
-        {isPending ? "Processing..." : isConfirming ? "Confirming..." : "Withdraw"}
-      </button>
-
-      {hash && (
-        <div className="rounded-[20px] bg-[rgba(255,255,255,0.6)] px-4 py-3 text-xs text-[var(--aegis-ink-muted)]">
-          <p className="font-semibold text-[var(--aegis-ink)]">Transaction Hash</p>
-          <p className="mt-1 break-all font-mono">{hash}</p>
-        </div>
-      )}
-    </form>
+        {hash && (
+          <div className="p-3 rounded-lg bg-secondary/50 border text-[10px] font-mono break-all opacity-60">
+            TX: {hash}
+          </div>
+        )}
+      </form>
+    </div>
   );
 }

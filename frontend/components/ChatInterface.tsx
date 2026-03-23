@@ -99,7 +99,7 @@ export function ChatInterface() {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "ai",
-        content: `Intent analyzed.\nRisk score: ${riskData.riskScore}/100\nParachain: ${getParachainName(riskData.parachainId)}\nStatus: ${riskData.safeToRoute ? "Safe to proceed" : "Too risky. Transaction blocked."}`,
+        content: `Intent analyzed.\n\n• Parachain: **${getParachainName(riskData.parachainId)}**\n• Risk Score: **${riskData.riskScore}/100**\n• Status: **${riskData.safeToRoute ? "Safe to proceed" : "Transaction blocked (High Risk)"}**`,
         timestamp: new Date(),
         data: riskData,
       };
@@ -110,7 +110,7 @@ export function ChatInterface() {
         const transactionMessage: Message = {
           id: (Date.now() + 2).toString(),
           type: "system",
-          content: "This route passed the risk gate. Confirm if you want to execute the transaction.",
+          content: "This route passed the risk gate. Would you like to execute the transaction?",
           timestamp: new Date(),
           data: riskData,
         };
@@ -156,29 +156,38 @@ export function ChatInterface() {
 
   if (!isConnected) {
     return (
-      <div className="aegis-panel px-6 py-10 text-center">
-        <p className="aegis-metric-label">Wallet Required</p>
-        <h2 className="mt-4 text-2xl font-semibold text-[var(--aegis-ink)]">Connect before opening the intent channel.</h2>
-        <p className="aegis-copy mt-3">
-          Use the connect control in the navigation bar to start chatting with Aegis.
-        </p>
+      <div className="aegis-panel p-12 text-center flex flex-col items-center justify-center space-y-6">
+        <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center text-4xl animate-pulse">
+          🤖
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold tracking-tight">AI Assistant Offline</h2>
+          <p className="text-muted-foreground max-w-sm">Connect your wallet to establish a secure intent channel with the Aegis AI Assistant.</p>
+        </div>
+        <button className="aegis-button aegis-button-primary px-8">Connect Wallet</button>
       </div>
     );
   }
 
   return (
-    <section className="aegis-panel overflow-hidden">
-      <div className="aegis-panel-strong aegis-grid-card rounded-none px-6 py-6">
-        <div className="relative z-10">
-          <p className="aegis-metric-label !text-white/60">Assistant Channel</p>
-          <h2 className="mt-3 text-2xl font-semibold text-white">Aegis chat assistant</h2>
-          <p className="mt-2 max-w-2xl text-sm text-white/74">
-            Submit a yield intent and receive an AI risk decision before any routing step is offered.
-          </p>
+    <section className="aegis-panel h-[600px] flex flex-col overflow-hidden">
+      <div className="p-4 border-b flex items-center justify-between bg-secondary/20">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
+            AE
+          </div>
+          <div>
+            <h2 className="text-sm font-bold">Aegis Assistant</h2>
+            <div className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Active Channel</span>
+            </div>
+          </div>
         </div>
+        <button className="text-xs font-medium text-muted-foreground hover:text-foreground">Clear Chat</button>
       </div>
 
-      <div className="aegis-scroll h-[28rem] space-y-4 overflow-y-auto bg-[rgba(255,251,253,0.72)] p-4 md:p-5">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-background to-secondary/10">
         {messages.map((message) => {
           const isUser = message.type === "user";
           const isSystem = message.type === "system";
@@ -186,48 +195,49 @@ export function ChatInterface() {
           return (
             <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[92%] rounded-[24px] px-4 py-3 text-sm shadow-[0_14px_32px_rgba(93,14,59,0.08)] md:max-w-[75%] ${
-                  isUser
-                    ? "bg-[linear-gradient(135deg,var(--aegis-brand-900),var(--aegis-brand-500))] text-white"
-                    : isSystem
-                    ? "border border-[rgba(49,196,122,0.22)] bg-[rgba(49,196,122,0.1)] text-[var(--aegis-ink)]"
-                    : "border border-[rgba(134,9,79,0.1)] bg-white text-[var(--aegis-ink)]"
-                }`}
+                className={`max-w-[85%] space-y-2 ${isUser ? "flex flex-col items-end" : "flex flex-col items-start"}`}
               >
-                <div className="whitespace-pre-wrap leading-7">{message.content}</div>
+                <div
+                  className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                    isUser
+                      ? "bg-primary text-primary-foreground shadow-md rounded-tr-none"
+                      : isSystem
+                      ? "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100 rounded-tl-none"
+                      : "bg-white dark:bg-zinc-900 border shadow-sm rounded-tl-none"
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">{message.content}</div>
 
-                {message.data &&
-                  message.type === "system" &&
-                  !dismissedConfirmations.includes(message.id) && (
-                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                      <button
-                        onClick={() => handleConfirmTransaction(message)}
-                        disabled={isPending || isConfirming}
-                        className="aegis-button aegis-button-primary w-full"
-                        data-testid="confirm-transaction"
-                      >
-                        {isPending
-                          ? "Confirming..."
-                          : isConfirming
-                          ? "Processing..."
-                          : isSuccess
-                          ? "Transaction Complete"
-                          : "Confirm Transaction"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCancelTransaction(message)}
-                        className="aegis-button aegis-button-secondary w-full"
-                        data-testid="cancel-transaction"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                )}
-
-                <div className={`mt-2 text-xs ${isUser ? "text-white/75" : "text-[var(--aegis-ink-muted)]"}`}>
-                  {message.timestamp.toLocaleTimeString()}
+                  {message.data &&
+                    message.type === "system" &&
+                    !dismissedConfirmations.includes(message.id) && (
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                        <button
+                          onClick={() => handleConfirmTransaction(message)}
+                          disabled={isPending || isConfirming}
+                          className="aegis-button bg-emerald-600 text-white hover:bg-emerald-700 w-full text-xs py-1.5 h-auto rounded-lg"
+                        >
+                          {isPending
+                            ? "Confirming..."
+                            : isConfirming
+                            ? "Processing..."
+                            : isSuccess
+                            ? "Completed"
+                            : "Execute Route"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCancelTransaction(message)}
+                          className="aegis-button bg-white text-zinc-900 border hover:bg-zinc-50 w-full text-xs py-1.5 h-auto rounded-lg"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                  )}
                 </div>
+                <span className="text-[10px] font-medium text-muted-foreground px-1 uppercase tracking-tighter">
+                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
             </div>
           );
@@ -235,10 +245,14 @@ export function ChatInterface() {
 
         {isLoading && (
           <div className="flex justify-start">
-            <div className="rounded-[24px] border border-[rgba(134,9,79,0.1)] bg-white px-4 py-3 shadow-[0_14px_32px_rgba(93,14,59,0.08)]">
-              <div className="flex items-center gap-3">
-                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-[var(--aegis-brand-700)]" />
-                <span className="text-sm text-[var(--aegis-ink-muted)]">Analyzing your request...</span>
+            <div className="bg-white dark:bg-zinc-900 border px-4 py-3 rounded-2xl rounded-tl-none shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="flex gap-1">
+                  <span className="h-1.5 w-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <span className="h-1.5 w-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <span className="h-1.5 w-1.5 bg-primary/40 rounded-full animate-bounce" />
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-2">Analyzing Route</span>
               </div>
             </div>
           </div>
@@ -247,27 +261,28 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-[rgba(134,9,79,0.1)] bg-white/60 p-4 md:p-5">
-        <div className="flex flex-col gap-3 md:flex-row">
+      <div className="p-4 bg-background border-t">
+        <form onSubmit={handleSubmit} className="relative flex items-center">
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Describe your DeFi intent. Example: Earn yield on Acala."
-            className="aegis-input flex-1"
+            placeholder="Type your DeFi intent..."
+            className="aegis-input w-full pr-24 h-12 rounded-xl focus-visible:ring-primary/20"
             disabled={isLoading}
-            data-testid="chat-intent-input"
           />
           <button
             type="submit"
             disabled={!inputValue.trim() || isLoading}
-            className="aegis-button aegis-button-primary md:min-w-[9rem]"
-            data-testid="chat-send-button"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 px-4 bg-primary text-primary-foreground rounded-lg font-bold text-xs shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all"
           >
             Send
           </button>
-        </div>
-      </form>
+        </form>
+        <p className="mt-3 text-center text-[10px] text-muted-foreground uppercase tracking-tighter font-medium">
+          Aegis AI may block routes that exceed your risk parameters.
+        </p>
+      </div>
     </section>
   );
 }

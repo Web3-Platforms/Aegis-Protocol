@@ -1,0 +1,15 @@
+# Environment
+.vercel
+.env*.local
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+
+# Build
+.next/
+out/

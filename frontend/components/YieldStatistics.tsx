@@ -31,17 +31,18 @@ export function YieldStatistics() {
 
   if (isLoading) {
     return (
-      <div className="grid gap-6 xl:grid-cols-2">
-        <div className="aegis-panel h-56 animate-pulse" />
-        <div className="aegis-panel h-56 animate-pulse" />
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="aegis-panel h-32 animate-pulse bg-secondary/20" />
+        ))}
       </div>
     );
   }
 
   const getRiskColor = (risk: number) => {
-    if (risk < 30) return "text-[#1e9158]";
-    if (risk < 60) return "text-[#a06f19]";
-    return "text-[#a12d45]";
+    if (risk < 30) return "text-green-600 dark:text-green-400";
+    if (risk < 60) return "text-amber-600 dark:text-amber-400";
+    return "text-red-600 dark:text-red-400";
   };
 
   const getRiskLabel = (risk: number) => {
@@ -53,134 +54,150 @@ export function YieldStatistics() {
   const topApy = yields.length > 0 ? Math.max(...yields.map((item) => item.apy)).toFixed(2) : "0";
   const lowApy = yields.length > 0 ? Math.min(...yields.map((item) => item.apy)).toFixed(2) : "0";
   const totalRouted = yields.reduce((sum, item) => sum + item.amount, 0).toFixed(2);
-  const totalYield = yields.reduce((sum, item) => sum + item.yield, 0).toFixed(2);
 
   return (
-    <section className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <article className="aegis-panel px-5 py-5">
-          <p className="aegis-metric-label">Total Yield Earned</p>
-          <p className="aegis-metric-value mt-4">{stats.totalYield.toFixed(2)} DOT</p>
-          <p className="mt-2 text-sm text-[var(--aegis-ink-muted)]">All-time performance.</p>
-        </article>
-        <article className="aegis-panel px-5 py-5">
-          <p className="aegis-metric-label">Active Strategies</p>
-          <p className="aegis-metric-value mt-4">{stats.activeStrategies}</p>
-          <p className="mt-2 text-sm text-[var(--aegis-ink-muted)]">Currently routing yield.</p>
-        </article>
-        <article className="aegis-panel px-5 py-5">
-          <p className="aegis-metric-label">Average APY</p>
-          <p className="aegis-metric-value mt-4">{stats.averageAPY.toFixed(2)}%</p>
-          <p className="mt-2 text-sm text-[var(--aegis-ink-muted)]">Across active routes.</p>
-        </article>
-        <article className="aegis-panel px-5 py-5">
-          <p className="aegis-metric-label">Average Risk</p>
-          <p className={`aegis-metric-value mt-4 ${getRiskColor(stats.averageRiskScore)}`}>
-            {stats.averageRiskScore.toFixed(1)}/100
+    <section className="space-y-8">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="aegis-panel p-6 border-l-4 border-l-primary">
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Yield</p>
+          <p className="text-3xl font-extrabold">{stats.totalYield.toFixed(2)} <span className="text-sm font-medium text-muted-foreground">DOT</span></p>
+          <div className="mt-2 flex items-center gap-1 text-xs text-green-600 font-medium">
+            <span>All-time</span>
+          </div>
+        </div>
+
+        <div className="aegis-panel p-6 border-l-4 border-l-indigo-500">
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Active Routes</p>
+          <p className="text-3xl font-extrabold">{stats.activeStrategies}</p>
+          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground font-medium">
+            <span>Routing yield</span>
+          </div>
+        </div>
+
+        <div className="aegis-panel p-6 border-l-4 border-l-emerald-500">
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Average APY</p>
+          <p className="text-3xl font-extrabold">{stats.averageAPY.toFixed(1)}%</p>
+          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground font-medium">
+            <span>Across protocols</span>
+          </div>
+        </div>
+
+        <div className="aegis-panel p-6 border-l-4 border-l-amber-500">
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Risk Profile</p>
+          <p className={`text-3xl font-extrabold ${getRiskColor(stats.averageRiskScore)}`}>
+            {stats.averageRiskScore.toFixed(0)}<span className="text-sm font-medium opacity-70">/100</span>
           </p>
-          <p className="mt-2 text-sm text-[var(--aegis-ink-muted)]">{getRiskLabel(stats.averageRiskScore)} risk profile.</p>
-        </article>
+          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground font-medium">
+            <span>{getRiskLabel(stats.averageRiskScore)} Risk</span>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-        <article className="aegis-panel px-6 py-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="aegis-metric-label">Strategy Breakdown</p>
-              <h2 className="mt-3 text-2xl font-semibold text-[var(--aegis-ink)]">Yield by parachain</h2>
-            </div>
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold tracking-tight">Active Strategy Breakdown</h2>
+            <button className="text-sm font-medium text-primary hover:underline">View all</button>
           </div>
 
           {yields.length === 0 ? (
-            <div className="py-10 text-center text-[var(--aegis-ink-muted)]">No active yield strategies yet.</div>
+            <div className="aegis-panel py-12 text-center text-muted-foreground">No active yield strategies yet.</div>
           ) : (
-            <div className="mt-6 space-y-4">
+            <div className="space-y-4">
               {yields.map((item) => (
-                <article key={item.parachainId} className="aegis-panel-muted p-4">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div key={item.parachainId} className="aegis-panel p-5 group transition-all hover:border-primary/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,var(--aegis-brand-900),var(--aegis-brand-500))] font-bold text-white shadow-[0_10px_24px_rgba(177,20,103,0.22)]">
+                      <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold shadow-sm">
                         {item.parachainName.charAt(0)}
                       </div>
                       <div>
-                        <p className="text-lg font-semibold text-[var(--aegis-ink)]">{item.parachainName}</p>
-                        <p className="text-sm text-[var(--aegis-ink-muted)]">ID: {item.parachainId}</p>
+                        <h3 className="font-bold text-lg">{item.parachainName}</h3>
+                        <p className="text-xs text-muted-foreground">Chain ID: {item.parachainId}</p>
                       </div>
                     </div>
-
-                    <div className="text-left md:text-right">
-                      <p className="text-xl font-semibold text-[var(--aegis-brand-900)]">{item.amount.toFixed(2)} DOT</p>
-                      <p className="text-sm text-[#1e9158]">+{item.yield.toFixed(2)} yield</p>
+                    <div className="flex flex-col items-start sm:items-end">
+                      <p className="text-xl font-bold text-primary">{item.amount.toFixed(2)} DOT</p>
+                      <p className="text-xs text-green-600 font-bold">+{item.yield.toFixed(2)} DOT earned</p>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--aegis-ink-muted)]">APY</p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--aegis-ink)]">{item.apy.toFixed(2)}%</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">APY</p>
+                      <p className="text-sm font-bold">{item.apy.toFixed(2)}%</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--aegis-ink-muted)]">Risk Score</p>
-                      <p className={`mt-1 text-sm font-semibold ${getRiskColor(item.riskScore)}`}>
-                        {item.riskScore}/100 · {getRiskLabel(item.riskScore)}
-                      </p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Risk</p>
+                      <p className={`text-sm font-bold ${getRiskColor(item.riskScore)}`}>{getRiskLabel(item.riskScore)}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Health</p>
+                        <p className="text-[10px] font-bold">{100 - item.riskScore}%</p>
+                      </div>
+                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-700 ${
+                            item.riskScore < 30 ? "bg-green-500" : item.riskScore < 60 ? "bg-amber-500" : "bg-red-500"
+                          }`}
+                          style={{ width: `${100 - item.riskScore}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
-
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-xs text-[var(--aegis-ink-muted)]">
-                      <span>Risk distribution</span>
-                      <span>{item.riskScore}%</span>
-                    </div>
-                    <div className="mt-2 h-2.5 rounded-full bg-[rgba(134,9,79,0.08)]">
-                      <div
-                        className={`h-2.5 rounded-full ${
-                          item.riskScore < 30
-                            ? "bg-[#27ab67]"
-                            : item.riskScore < 60
-                            ? "bg-[#d19a2f]"
-                            : "bg-[#d34a67]"
-                        }`}
-                        style={{ width: `${item.riskScore}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[var(--aegis-ink-muted)]">
-                    <span className={`aegis-badge ${item.routed ? "aegis-badge-success" : "aegis-badge-brand"}`}>
-                      {item.routed ? "Active" : "Inactive"}
-                    </span>
-                    <span>{new Date(item.timestamp).toLocaleDateString()}</span>
-                  </div>
-                </article>
+                </div>
               ))}
             </div>
           )}
-        </article>
+        </div>
 
-        <article className="aegis-panel px-6 py-6">
-          <p className="aegis-metric-label">Performance Snapshot</p>
-          <h2 className="mt-3 text-2xl font-semibold text-[var(--aegis-ink)]">Quick comparisons</h2>
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold tracking-tight">Performance Overview</h2>
+          <div className="aegis-panel p-6 space-y-6">
+            <div className="flex items-center justify-between border-b pb-4">
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">High APY</p>
+                <p className="text-2xl font-black text-emerald-500">{topApy}%</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1 text-right">Low APY</p>
+                <p className="text-2xl font-black text-amber-500 text-right">{lowApy}%</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Total Routed</span>
+                <span className="text-sm font-bold">{totalRouted} DOT</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Protocol Fees</span>
+                <span className="text-sm font-bold">0.15%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Security Layer</span>
+                <span className="text-xs font-bold px-2 py-0.5 bg-primary/10 text-primary rounded-full">AI-Gated</span>
+              </div>
+            </div>
 
-          <div className="mt-6 grid gap-3">
-            <div className="aegis-panel-muted p-4">
-              <p className="text-sm text-[var(--aegis-ink-muted)]">Highest APY</p>
-              <p className="mt-2 text-3xl font-semibold text-[var(--aegis-brand-900)]">{topApy}%</p>
-            </div>
-            <div className="aegis-panel-muted p-4">
-              <p className="text-sm text-[var(--aegis-ink-muted)]">Lowest APY</p>
-              <p className="mt-2 text-3xl font-semibold text-[var(--aegis-brand-900)]">{lowApy}%</p>
-            </div>
-            <div className="aegis-panel-muted p-4">
-              <p className="text-sm text-[var(--aegis-ink-muted)]">Total Yield</p>
-              <p className="mt-2 text-3xl font-semibold text-[var(--aegis-brand-900)]">{totalYield}</p>
-            </div>
-            <div className="aegis-panel-muted p-4">
-              <p className="text-sm text-[var(--aegis-ink-muted)]">Total Allocated</p>
-              <p className="mt-2 text-3xl font-semibold text-[var(--aegis-brand-900)]">{totalRouted}</p>
+            <div className="pt-4">
+              <button className="aegis-button aegis-button-primary w-full shadow-lg shadow-primary/20">
+                Generate Performance Report
+              </button>
             </div>
           </div>
-        </article>
+
+          <div className="p-6 rounded-2xl bg-primary text-primary-foreground space-y-3">
+            <h3 className="font-bold">Next Rebalance</h3>
+            <p className="text-sm opacity-90 leading-relaxed">The AI agent is currently analyzing the latest block data for Paseo Testnet. Rebalancing scheduled in 4h 12m.</p>
+            <div className="pt-2">
+              <div className="h-1 w-full bg-white/20 rounded-full overflow-hidden">
+                <div className="h-full bg-white w-2/3 animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

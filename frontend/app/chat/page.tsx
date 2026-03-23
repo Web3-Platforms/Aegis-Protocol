@@ -4,47 +4,68 @@ import { ChatInterface } from "@/components/ChatInterface";
 
 export default function ChatPage() {
   return (
-    <div className="aegis-page">
-      <div className="aegis-shell space-y-8">
-        <section className="aegis-page-header grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div>
-            <span className="aegis-kicker">Intent Console</span>
-            <h1 className="aegis-display aegis-page-title">Describe the move. Let Aegis score the route.</h1>
-            <p className="aegis-page-subtitle">
-              The chat surface keeps the same yield-intent flow, but now presents risk analysis inside a calmer, more precise decision environment.
+    <div className="pb-20">
+      <div className="bg-primary/5 border-b py-16 mb-12">
+        <div className="aegis-shell">
+          <div className="max-w-3xl space-y-4">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest">
+              AI Intent Engine
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-[1.1]">
+              Aegis <span className="text-primary">Assistant</span>.
+            </h1>
+            <p className="text-lg text-muted-foreground font-medium max-w-2xl leading-relaxed">
+              Describe your DeFi goals in plain English. Our AI risk oracle will analyze the route, score the potential risks, and help you execute safely.
             </p>
           </div>
+        </div>
+      </div>
 
-          <div className="aegis-panel px-6 py-6">
-            <p className="aegis-metric-label">How It Works</p>
-            <ol className="mt-4 space-y-3 text-sm text-[var(--aegis-ink-muted)]">
-              <li>1. Describe a strategy such as earning yield on Acala.</li>
-              <li>2. Aegis evaluates risk before any routing step is offered.</li>
-              <li>3. If the score is below the threshold, execution can proceed.</li>
-              <li>4. Unsafe routes remain blocked by design.</li>
-            </ol>
+      <div className="aegis-shell space-y-12">
+        <div className="grid gap-8 lg:grid-cols-[1fr_350px]">
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold tracking-tight">Intent Channel</h2>
+            <ChatInterface />
           </div>
-        </section>
 
-        <ChatInterface />
+          <div className="space-y-8">
+            <div className="aegis-panel p-6 space-y-6">
+              <h3 className="font-bold text-sm uppercase tracking-widest text-muted-foreground">How It Works</h3>
+              <div className="space-y-4">
+                {[
+                  { title: "Describe", text: "State a goal like 'Earn yield on Acala'." },
+                  { title: "Analyze", text: "Aegis evaluates risk before offering routes." },
+                  { title: "Score", text: "Routes must be below the risk threshold." },
+                  { title: "Execute", text: "Safe routes can be executed instantly." }
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-4">
+                    <div className="h-6 w-6 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                      {i+1}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{step.title}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{step.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-        <section className="grid gap-4 md:grid-cols-2">
-          <article className="aegis-panel px-6 py-6">
-            <p className="aegis-metric-label">Risk Gate</p>
-            <h2 className="mt-3 text-2xl font-semibold text-[var(--aegis-ink)]">AI protection stays visible.</h2>
-            <p className="aegis-copy mt-3">
-              The updated UI makes safe versus blocked outcomes more legible without changing the routing logic behind them.
-            </p>
-          </article>
+            <div className="aegis-panel p-6 space-y-4 border-l-4 border-l-indigo-500">
+              <h3 className="font-bold text-sm uppercase tracking-widest text-muted-foreground">AI Protection</h3>
+              <p className="text-xs font-medium text-muted-foreground leading-relaxed">
+                The Aegis AI Oracle monitors block-level data across the Polkadot ecosystem to identify anomalous behavior before it affects your capital.
+              </p>
+            </div>
 
-          <article className="aegis-panel px-6 py-6">
-            <p className="aegis-metric-label">Operator Note</p>
-            <h2 className="mt-3 text-2xl font-semibold text-[var(--aegis-ink)]">Use chat for exploration, vault for execution.</h2>
-            <p className="aegis-copy mt-3">
-              This separation remains intact. The redesign just makes the transition between those surfaces feel intentional.
-            </p>
-          </article>
-        </section>
+            <div className="aegis-panel p-6 space-y-4 border-l-4 border-l-emerald-500">
+              <h3 className="font-bold text-sm uppercase tracking-widest text-muted-foreground">Safe Routing</h3>
+              <p className="text-xs font-medium text-muted-foreground leading-relaxed">
+                Every transaction executed through this channel is wrapped in a safety-first routing logic that prioritizes capital preservation.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

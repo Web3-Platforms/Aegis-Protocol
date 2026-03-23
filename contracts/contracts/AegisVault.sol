@@ -6,20 +6,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/**# 1. Set up wallet (create .env in contracts/)
-echo "PRIVATE_KEY=0x<your-testnet-private-key>" > contracts/.env.local
-
-# 2. Get Paseo testnet tokens from faucet
-# https://faucet.polkadot.io
-
-# 3. Deploy contracts
-cd contracts && npm run deploy
-
-# 4. Run frontend locally
-cd ../frontend && npm run dev
-# Runs on http://127.0.0.1:3010
- * @dev Mock interface for Polkadot's XCM precompile
+/**
+ * @title IPolkadotXCM
+ * @dev Mock interface for Polkadot's XCM precompile.
  * In production, this would interact with the actual PolkadotXCM precompile
+ * at a well-known address on Asset Hub / relay chain.
  */
 interface IPolkadotXCM {
     /// @dev Send XCM to a parachain with asset instructions

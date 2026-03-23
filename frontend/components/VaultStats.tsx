@@ -35,58 +35,64 @@ export function VaultStats() {
 
   return (
     <section className="grid gap-6 xl:grid-cols-2">
-      <article className="aegis-panel px-6 py-6">
-        <div className="flex items-center justify-between gap-4">
+      <article className="aegis-panel p-6 overflow-hidden relative">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <p className="aegis-metric-label">Wallet Positioning</p>
-            <h2 className="mt-3 text-2xl font-semibold text-[var(--aegis-ink)]">Your deposits</h2>
+            <h2 className="text-xl font-bold tracking-tight">Your Deposits</h2>
+            <p className="text-sm text-muted-foreground">Managing your assets in the vault</p>
           </div>
           <span className={`aegis-badge ${isConnected ? "aegis-badge-success" : "aegis-badge-brand"}`}>
-            {isConnected ? "Connected" : "Wallet offline"}
+            {isConnected ? "Connected" : "Not Connected"}
           </span>
         </div>
 
-        <div className="mt-6 space-y-3">
+        <div className="space-y-4">
           {vaultStats.map((stat) => (
-            <div key={stat.token.address} className="aegis-panel-muted flex items-center justify-between gap-4 p-4">
-              <div>
-                <p className="text-base font-semibold text-[var(--aegis-ink)]">
-                  {stat.token.icon} {stat.token.symbol}
-                </p>
-                <p className="mt-1 text-sm text-[var(--aegis-ink-muted)]">
-                  Vault share: {stat.userShare.toFixed(2)}%
-                </p>
+            <div key={stat.token.address} className="flex items-center justify-between p-4 rounded-xl border bg-secondary/30 transition-colors hover:bg-secondary/50">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{stat.token.icon}</span>
+                <div>
+                  <p className="font-semibold">{stat.token.symbol}</p>
+                  <p className="text-xs text-muted-foreground">Share: {stat.userShare.toFixed(2)}%</p>
+                </div>
               </div>
-              <p className="text-xl font-semibold text-[var(--aegis-brand-900)]">{stat.userDeposit.toFixed(6)}</p>
+              <div className="text-right">
+                <p className="text-lg font-bold">{stat.userDeposit.toFixed(4)}</p>
+              </div>
             </div>
           ))}
+          {!isConnected && (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">Connect your wallet to see your deposits</p>
+            </div>
+          )}
         </div>
       </article>
 
-      <article className="aegis-panel px-6 py-6">
-        <div className="flex items-center justify-between gap-4">
+      <article className="aegis-panel p-6">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <p className="aegis-metric-label">Protocol Inventory</p>
-            <h2 className="mt-3 text-2xl font-semibold text-[var(--aegis-ink)]">Total vault deposits</h2>
+            <h2 className="text-xl font-bold tracking-tight">Total Vault TVL</h2>
+            <p className="text-sm text-muted-foreground">Protocol-wide liquidity metrics</p>
           </div>
-          <span className="aegis-badge aegis-badge-brand">Live on-chain reads</span>
+          <span className="aegis-badge aegis-badge-brand">Real-time</span>
         </div>
 
-        <div className="mt-6 space-y-3">
+        <div className="space-y-4">
           {vaultStats.map((stat) => (
-            <div key={stat.token.address} className="aegis-panel-muted p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-base font-semibold text-[var(--aegis-ink)]">
-                    {stat.token.icon} {stat.token.symbol}
-                  </p>
-                  {isConnected && stat.userDeposit > 0 ? (
-                    <p className="mt-1 text-sm text-[var(--aegis-ink-muted)]">Your share: {stat.userShare.toFixed(2)}%</p>
-                  ) : (
-                    <p className="mt-1 text-sm text-[var(--aegis-ink-muted)]">Protocol-wide balance</p>
-                  )}
+            <div key={stat.token.address} className="p-4 rounded-xl border bg-secondary/30 transition-colors hover:bg-secondary/50">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{stat.token.icon}</span>
+                  <p className="font-semibold">{stat.token.symbol}</p>
                 </div>
-                <p className="text-xl font-semibold text-[var(--aegis-brand-900)]">{stat.totalDeposits.toFixed(6)}</p>
+                <p className="text-lg font-bold">{stat.totalDeposits.toFixed(2)}</p>
+              </div>
+              <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-500" 
+                  style={{ width: `${Math.min(stat.totalDeposits / 1000 * 100, 100)}%` }}
+                />
               </div>
             </div>
           ))}

@@ -9,112 +9,113 @@ import { TransactionHistory } from "@/components/TransactionHistory";
 const guides = [
   {
     title: "Deposit Flow",
+    icon: "📥",
     steps: [
       "Choose a supported token.",
-      "Enter the amount to move into the vault.",
-      "Approve and submit the wallet transaction.",
-      "Track the position in the live history panel.",
+      "Enter amount to move into vault.",
+      "Approve wallet transaction.",
+      "Track position in history panel.",
     ],
   },
   {
     title: "Withdrawal Flow",
+    icon: "📤",
     steps: [
       "Select the asset you want back.",
       "Enter a value or use max balance.",
-      "Confirm the withdrawal request in your wallet.",
-      "Watch the vault balance refresh after settlement.",
+      "Confirm request in your wallet.",
+      "Vault balance refreshes instantly.",
     ],
   },
   {
     title: "Supported Assets",
+    icon: "💎",
     steps: [
-      "DOT with 18 decimals.",
-      "USDT with 6 decimals.",
-      "USDC with 6 decimals.",
-      "All assets share the same core vault workflow.",
+      "DOT (18 decimals)",
+      "USDT (6 decimals)",
+      "USDC (6 decimals)",
+      "Unified vault workflow.",
     ],
   },
   {
-    title: "Operational Notes",
+    title: "Notes",
+    icon: "📝",
     steps: [
-      "Token approval is required before deposit execution.",
-      "Verify network fees before confirming.",
-      "Balances update after confirmation.",
-      "Minimum deposit amount remains 0.01 tokens.",
+      "Token approval is required.",
+      "Verify network fees.",
+      "Real-time balance updates.",
+      "Min deposit: 0.01 tokens.",
     ],
   },
 ];
 
 export default function VaultPage() {
   return (
-    <div className="aegis-page">
-      <div className="aegis-shell space-y-8">
-        <section className="aegis-page-header grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <div>
-            <span className="aegis-kicker">Vault Console</span>
-            <h1 className="aegis-display aegis-page-title">Capital management wrapped in the Aegis shield.</h1>
-            <p className="aegis-page-subtitle">
-              Deposits, withdrawals, and on-chain position tracking now sit inside a cleaner premium shell built from the logo’s geometry and palette.
+    <div className="pb-20">
+      <div className="bg-primary/5 border-b py-16 mb-12">
+        <div className="aegis-shell">
+          <div className="max-w-3xl space-y-4">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest">
+              Capital Management
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-[1.1]">
+              Aegis <span className="text-primary">Vault</span> Console.
+            </h1>
+            <p className="text-lg text-muted-foreground font-medium max-w-2xl leading-relaxed">
+              Securely deposit, withdraw, and track your on-chain yield positions with institutional-grade risk monitoring and AI-guarded routing.
             </p>
           </div>
+        </div>
+      </div>
 
-          <div className="aegis-panel px-6 py-6">
-            <p className="aegis-metric-label">Design Intent</p>
-            <p className="mt-4 text-2xl font-semibold text-[var(--aegis-ink)]">
-              Preserve the vault workflow and sharpen the operational UX.
-            </p>
-            <p className="aegis-copy mt-3">
-              No feature or route changes. Only hierarchy, visual trust signals, spacing, and component consistency were upgraded.
-            </p>
-          </div>
-        </section>
-
+      <div className="aegis-shell space-y-12">
         <VaultStats />
 
-        <section className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-8 lg:grid-cols-2">
           <DepositForm />
           <WithdrawalForm />
-        </section>
+        </div>
 
         <TransactionHistory />
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {guides.map((guide) => (
-            <article key={guide.title} className="aegis-panel px-5 py-5">
-              <h2 className="text-xl font-semibold text-[var(--aegis-ink)]">{guide.title}</h2>
-              <ol className="mt-4 space-y-3 text-sm text-[var(--aegis-ink-muted)]">
+            <div key={guide.title} className="aegis-panel p-6 space-y-4 hover:border-primary/30 transition-colors">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{guide.icon}</span>
+                <h3 className="font-bold text-sm tracking-tight">{guide.title}</h3>
+              </div>
+              <ul className="space-y-2">
                 {guide.steps.map((step, index) => (
-                  <li key={`${guide.title}-${step}`} className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgba(219,77,146,0.12)] text-xs font-bold text-[var(--aegis-brand-900)]">
-                      {index + 1}
-                    </span>
-                    <span className="leading-6">{step}</span>
+                  <li key={index} className="flex gap-2 text-xs font-medium text-muted-foreground">
+                    <span className="text-primary opacity-50">•</span>
+                    <span>{step}</span>
                   </li>
                 ))}
-              </ol>
-            </article>
+              </ul>
+            </div>
           ))}
-        </section>
+        </div>
 
-        <section id="docs" className="aegis-panel-strong aegis-grid-card rounded-[30px] px-6 py-7 md:px-8">
-          <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="aegis-metric-label !text-white/60">Guidance</p>
-              <h2 className="mt-3 text-3xl font-semibold text-white">Need protocol context while moving funds?</h2>
-              <p className="mt-3 max-w-2xl text-white/78">
-                Keep the vault workflow here, or switch to the chat surface for AI-assisted routing context without leaving the Aegis experience.
+        <div className="bg-zinc-900 rounded-3xl p-8 md:p-12 text-white relative overflow-hidden">
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-primary/20 blur-[100px] rounded-full translate-y-1/2 translate-x-1/2" />
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="max-w-xl space-y-4">
+              <h2 className="text-3xl font-bold tracking-tight">Need assistance?</h2>
+              <p className="text-zinc-400 font-medium leading-relaxed">
+                If you're unsure about a specific yield strategy or want to verify a route before execution, our AI assistant is here to help.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/chat" className="aegis-button aegis-button-tertiary">
-                Open Chat
+            <div className="flex gap-4 shrink-0">
+              <Link href="/chat" className="h-12 px-8 bg-primary text-white rounded-xl flex items-center justify-center font-bold hover:scale-105 transition-all">
+                Launch Assistant
               </Link>
-              <Link href="/" className="aegis-button aegis-button-secondary">
-                Protocol Overview
+              <Link href="/activity" className="h-12 px-8 bg-zinc-800 text-white rounded-xl flex items-center justify-center font-bold hover:bg-zinc-700 transition-all">
+                View Analytics
               </Link>
             </div>
           </div>
-        </section>
+        </div>
       </div>
     </div>
   );

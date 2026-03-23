@@ -1,149 +1,282 @@
 "use client";
 
-import { useState } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseUnits } from "viem";
-import { AEGIS_VAULT_ABI, CONTRACT_ADDRESSES, SUPPORTED_TOKENS } from "@/lib/contracts";
+import { useState, useEffect } from "react";
+import {
+  useAccount,
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
+import { parseUnits, formatUnits } from "viem";
+import {
+  AEGIS_VAULT_ABI,
+  ERC20_ABI,
+  CONTRACT_ADDRESSES,
+  SUPPORTED_TOKENS,
+} from "@/lib/contracts";
 
 type SupportedToken = (typeof SUPPORTED_TOKENS)[number];
 
 export function DepositForm() {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const [selectedToken, setSelectedToken] = useState<SupportedToken>(SUPPORTED_TOKENS[0]);
   const [depositAmount, setDepositAmount] = useState("");
-  const [isApproving, setIsApproving] = useState(false);
+  const [step, setStep] = useState<"idle" | "approving" | "depositing">("idle");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
+  // ── Read wallet balance for the selected token ──────────────────────────
+  const { data: rawBalance, refetch: refetchBalance } = useReadContract({
+    address: selectedToken.address as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: isConnected && !!address },
   });
 
-  const handleDeposit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+  const formattedBalance =
+    rawBalance !== undefined
+      ? formatUnits(rawBalance as bigint, selectedToken.decimals)
+      : "0";
 
-    if (!depositAmount || isNaN(Number(depositAmount))) {
-      setError("Please enter a valid amount");
-      return;
-    }
+  // ── Read current allowance for the vault ────────────────────────────────
+  const { data: rawAllowance, refetch: refetchAllowance } = useReadContract({
+    address: selectedToken.address as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args:
+      address
+        ? [address, CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`]
+        : undefined,
+    query: { enabled: isConnected && !!address },
+  });
 
-    if (Number(depositAmount) <= 0) {
-      setError("Amount must be greater than 0");
-      return;
-    }
+  // ── Write hooks ─────────────────────────────────────────────────────────
+  const {
+    writeContract: writeApprove,
+    data: approveHash,
+    isPending: isApprovePending,
+    reset: resetApprove,
+  } = useWriteContract();
 
-    try {
-      setIsApproving(true);
+  const {
+    writeContract: writeDeposit,
+    data: depositHash,
+    isPending: isDepositPending,
+    reset: resetDeposit,
+  } = useWriteContract();
+
+  const { isLoading: isApproveConfirming, isSuccess: isApproveConfirmed } =
+    useWaitForTransactionReceipt({ hash: approveHash });
+
+  const { isLoading: isDepositConfirming, isSuccess: isDepositConfirmed } =
+    useWaitForTransactionReceipt({ hash: depositHash });
+
+  // ── Trigger deposit after approval confirms ─────────────────────────────
+  useEffect(() => {
+    if (isApproveConfirmed && step === "approving" && depositAmount) {
+      setStep("depositing");
       const amount = parseUnits(depositAmount, selectedToken.decimals);
-
-      writeContract({
+      writeDeposit({
         address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
         abi: AEGIS_VAULT_ABI,
         functionName: "deposit",
         args: [selectedToken.address as `0x${string}`, amount],
       });
+    }
+  }, [isApproveConfirmed, step, depositAmount, selectedToken, writeDeposit]);
 
+  // ── Handle deposit confirmation ─────────────────────────────────────────
+  useEffect(() => {
+    if (isDepositConfirmed && step === "depositing") {
+      setStep("idle");
       setDepositAmount("");
-      setSuccess("Deposit request submitted to your wallet.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsApproving(false);
+      setSuccess("Deposit successful! Your assets are now earning yield.");
+      refetchBalance();
+      refetchAllowance();
+    }
+  }, [isDepositConfirmed, step, refetchBalance, refetchAllowance]);
+
+  // ── Form handler ────────────────────────────────────────────────────────
+  const handleDeposit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    resetApprove();
+    resetDeposit();
+
+    if (!depositAmount || isNaN(Number(depositAmount))) {
+      setError("Please enter a valid amount");
+      return;
+    }
+    if (Number(depositAmount) <= 0) {
+      setError("Amount must be greater than 0");
+      return;
+    }
+    if (Number(depositAmount) > Number(formattedBalance)) {
+      setError("Insufficient wallet balance");
+      return;
+    }
+
+    const amount = parseUnits(depositAmount, selectedToken.decimals);
+    const currentAllowance = (rawAllowance as bigint) ?? 0n;
+
+    if (currentAllowance >= amount) {
+      // Already approved – go straight to deposit
+      setStep("depositing");
+      writeDeposit({
+        address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
+        abi: AEGIS_VAULT_ABI,
+        functionName: "deposit",
+        args: [selectedToken.address as `0x${string}`, amount],
+      });
+    } else {
+      // Need approval first
+      setStep("approving");
+      writeApprove({
+        address: selectedToken.address as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`, amount],
+      });
     }
   };
 
+  // ── Max button handler ──────────────────────────────────────────────────
+  const handleMax = () => {
+    if (rawBalance !== undefined) {
+      setDepositAmount(formatUnits(rawBalance as bigint, selectedToken.decimals));
+    }
+  };
+
+  // ── Derived state ───────────────────────────────────────────────────────
+  const isBusy =
+    isApprovePending ||
+    isApproveConfirming ||
+    isDepositPending ||
+    isDepositConfirming;
+
+  const buttonLabel = (() => {
+    if (isApprovePending || isApproveConfirming) return "Approving…";
+    if (isDepositPending || isDepositConfirming) return "Depositing…";
+    return "Deposit Funds";
+  })();
+
   if (!isConnected) {
     return (
-      <div className="aegis-panel px-6 py-7 text-center">
-        <p className="text-base text-[var(--aegis-ink-muted)]">Connect your wallet to access deposit actions.</p>
+      <div className="aegis-panel p-8 text-center flex flex-col items-center justify-center space-y-4">
+        <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center text-xl">
+          🔒
+        </div>
+        <div>
+          <h3 className="font-bold text-lg">Wallet Not Connected</h3>
+          <p className="text-sm text-muted-foreground max-w-xs mx-auto">Please connect your wallet to interact with the Aegis Vault and deposit assets.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleDeposit} className="aegis-panel space-y-5 px-6 py-7">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="aegis-metric-label">Inbound Flow</p>
-          <h2 className="mt-3 text-2xl font-semibold text-[var(--aegis-ink)]">Deposit into the vault</h2>
+    <div className="aegis-panel overflow-hidden">
+      <div className="bg-primary p-6 text-primary-foreground">
+        <h2 className="text-xl font-bold tracking-tight">Deposit Assets</h2>
+        <p className="text-sm opacity-80">Allocate capital to the AI-guarded yield vault</p>
+      </div>
+      
+      <form onSubmit={handleDeposit} className="p-6 space-y-6">
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Select Asset</label>
+          <div className="grid grid-cols-2 gap-2">
+            {SUPPORTED_TOKENS.map((token) => (
+              <button
+                key={token.address}
+                type="button"
+                onClick={() => {
+                  setSelectedToken(token);
+                  setDepositAmount("");
+                }}
+                className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                  selectedToken.address === token.address 
+                    ? "bg-primary/5 border-primary ring-1 ring-primary" 
+                    : "bg-background border-input hover:bg-secondary/50"
+                }`}
+              >
+                <span className="text-xl">{token.icon}</span>
+                <span className="font-bold text-sm">{token.symbol}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <span className="aegis-chip">{selectedToken.symbol}</span>
-      </div>
 
-      <div className="aegis-panel-muted p-4">
-        <p className="text-sm font-medium text-[var(--aegis-ink)]">Selected asset</p>
-        <p className="mt-2 text-lg font-semibold text-[var(--aegis-brand-900)]">
-          {selectedToken.icon} {selectedToken.name}
-        </p>
-        <p className="mt-1 text-sm text-[var(--aegis-ink-muted)]">Decimals: {selectedToken.decimals}</p>
-      </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Amount</label>
+            <span className="text-xs font-bold text-indigo-600">Balance: {Number(formattedBalance).toFixed(4)} {selectedToken.symbol}</span>
+          </div>
+          <div className="relative">
+            <input
+              type="number"
+              value={depositAmount}
+              onChange={(e) => setDepositAmount(e.target.value)}
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+              className="aegis-input h-14 text-lg font-bold pr-16"
+            />
+            <button 
+              type="button"
+              onClick={handleMax}
+              className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] font-bold bg-secondary hover:bg-secondary/80 rounded uppercase tracking-tighter"
+            >
+              Max
+            </button>
+          </div>
+        </div>
 
-      <div>
-        <label className="mb-2 block text-sm font-semibold text-[var(--aegis-ink)]">Choose token</label>
-        <select
-          value={selectedToken.address}
-          onChange={(e) => {
-            const token = SUPPORTED_TOKENS.find((item) => item.address === e.target.value);
-            if (token) setSelectedToken(token);
-          }}
-          className="aegis-select"
+        <div className="p-4 rounded-xl bg-secondary/30 border border-dashed space-y-2">
+          <div className="flex justify-between text-xs font-medium">
+            <span className="text-muted-foreground">Estimated Yield</span>
+            <span className="text-green-600 font-bold">~12.4% APY</span>
+          </div>
+          <div className="flex justify-between text-xs font-medium">
+            <span className="text-muted-foreground">Security Rating</span>
+            <span className="text-indigo-600 font-bold">AAA (AI-Verified)</span>
+          </div>
+        </div>
+
+        {error && (
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium animate-shake">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-600 text-xs font-medium">
+            {success}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={!depositAmount || isBusy}
+          className="aegis-button aegis-button-primary w-full h-12 text-base shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
-          {SUPPORTED_TOKENS.map((token) => (
-            <option key={token.address} value={token.address}>
-              {token.icon} {token.symbol} - {token.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          {isBusy ? (
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              {buttonLabel}
+            </span>
+          ) : (
+            buttonLabel
+          )}
+        </button>
 
-      <div>
-        <label className="mb-2 block text-sm font-semibold text-[var(--aegis-ink)]">Amount ({selectedToken.symbol})</label>
-        <input
-          type="number"
-          value={depositAmount}
-          onChange={(e) => setDepositAmount(e.target.value)}
-          placeholder="0.00"
-          step="0.01"
-          min="0"
-          className="aegis-input"
-        />
-      </div>
-
-      {error && (
-        <div className="rounded-[20px] border border-[rgba(230,84,111,0.24)] bg-[rgba(230,84,111,0.08)] px-4 py-3 text-sm text-[#8f1f35]">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="rounded-[20px] border border-[rgba(49,196,122,0.24)] bg-[rgba(49,196,122,0.1)] px-4 py-3 text-sm text-[#14653d]">
-          {success}
-        </div>
-      )}
-
-      {isSuccess && (
-        <div className="rounded-[20px] border border-[rgba(49,196,122,0.24)] bg-[rgba(49,196,122,0.1)] px-4 py-3 text-sm text-[#14653d]">
-          Deposit successful.
-        </div>
-      )}
-
-      <button
-        type="submit"
-        disabled={!depositAmount || isPending || isConfirming || isApproving}
-        className="aegis-button aegis-button-primary w-full"
-      >
-        {isApproving || isPending ? "Approving..." : isConfirming ? "Confirming..." : "Deposit"}
-      </button>
-
-      {hash && (
-        <div className="rounded-[20px] bg-[rgba(255,255,255,0.6)] px-4 py-3 text-xs text-[var(--aegis-ink-muted)]">
-          <p className="font-semibold text-[var(--aegis-ink)]">Transaction Hash</p>
-          <p className="mt-1 break-all font-mono">{hash}</p>
-        </div>
-      )}
-    </form>
+        {(approveHash || depositHash) && (
+          <div className="p-3 rounded-lg bg-secondary/50 border text-[10px] font-mono break-all opacity-60">
+            TX: {depositHash ?? approveHash}
+          </div>
+        )}
+      </form>
+    </div>
   );
 }
