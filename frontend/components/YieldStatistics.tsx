@@ -1,33 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getYieldData, getYieldStats, type YieldData } from "@/lib/mockData";
+import type { ActivityStats, ActivityYield } from "@/lib/useVaultActivityData";
 
-export function YieldStatistics() {
-  const [yields, setYields] = useState<YieldData[]>([]);
-  const [stats, setStats] = useState({
-    totalYield: 0,
-    activeStrategies: 0,
-    averageAPY: 0,
-    averageRiskScore: 0,
-  });
-  const [isLoading, setIsLoading] = useState(true);
+interface YieldStatisticsProps {
+  yields: ActivityYield[];
+  stats: ActivityStats;
+  isLoading: boolean;
+}
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [yieldData, yieldStats] = await Promise.all([getYieldData(), getYieldStats()]);
-        setYields(yieldData);
-        setStats(yieldStats);
-      } catch (error) {
-        console.error("Failed to fetch yield data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+export function YieldStatistics({ yields, stats, isLoading }: YieldStatisticsProps) {
 
   if (isLoading) {
     return (
@@ -57,10 +38,13 @@ export function YieldStatistics() {
 
   return (
     <section className="space-y-8">
+      <div className="aegis-panel p-4 bg-amber-50/50 border border-amber-200/50 text-amber-900 dark:text-amber-200">
+        Source: on-chain `YieldRoutedViaXCM` events. APY and earned yield remain unavailable until indexer/PnL analytics are integrated.
+      </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <div className="aegis-panel p-6 border-l-4 border-l-primary">
           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Yield</p>
-          <p className="text-3xl font-extrabold">{stats.totalYield.toFixed(2)} <span className="text-sm font-medium text-muted-foreground">DOT</span></p>
+          <p className="text-3xl font-extrabold">{stats.totalYieldRouted.toFixed(2)} <span className="text-sm font-medium text-muted-foreground">USDC</span></p>
           <div className="mt-2 flex items-center gap-1 text-xs text-green-600 font-medium">
             <span>All-time</span>
           </div>
@@ -76,7 +60,7 @@ export function YieldStatistics() {
 
         <div className="aegis-panel p-6 border-l-4 border-l-emerald-500">
           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Average APY</p>
-          <p className="text-3xl font-extrabold">{stats.averageAPY.toFixed(1)}%</p>
+          <p className="text-3xl font-extrabold">N/A</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground font-medium">
             <span>Across protocols</span>
           </div>
@@ -117,15 +101,15 @@ export function YieldStatistics() {
                       </div>
                     </div>
                     <div className="flex flex-col items-start sm:items-end">
-                      <p className="text-xl font-bold text-primary">{item.amount.toFixed(2)} DOT</p>
-                      <p className="text-xs text-green-600 font-bold">+{item.yield.toFixed(2)} DOT earned</p>
+                      <p className="text-xl font-bold text-primary">{item.amount.toFixed(2)} USDC</p>
+                      <p className="text-xs text-muted-foreground font-bold">Yield analytics pending indexer</p>
                     </div>
                   </div>
 
                   <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">APY</p>
-                      <p className="text-sm font-bold">{item.apy.toFixed(2)}%</p>
+                      <p className="text-sm font-bold">N/A</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Risk</p>
@@ -169,11 +153,11 @@ export function YieldStatistics() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-muted-foreground">Total Routed</span>
-                <span className="text-sm font-bold">{totalRouted} DOT</span>
+                <span className="text-sm font-bold">{totalRouted} USDC</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-muted-foreground">Protocol Fees</span>
-                <span className="text-sm font-bold">0.15%</span>
+                <span className="text-sm font-bold">—</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-muted-foreground">Security Layer</span>
@@ -190,7 +174,9 @@ export function YieldStatistics() {
 
           <div className="p-6 rounded-2xl bg-primary text-primary-foreground space-y-3">
             <h3 className="font-bold">Next Rebalance</h3>
-            <p className="text-sm opacity-90 leading-relaxed">The AI agent is currently analyzing the latest block data for Paseo Testnet. Rebalancing scheduled in 4h 12m.</p>
+            <p className="text-sm opacity-90 leading-relaxed">
+              MVP beta: rebalance timing is simulated until indexed scheduling is available.
+            </p>
             <div className="pt-2">
               <div className="h-1 w-full bg-white/20 rounded-full overflow-hidden">
                 <div className="h-full bg-white w-2/3 animate-pulse" />

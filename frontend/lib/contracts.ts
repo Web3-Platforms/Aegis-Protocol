@@ -58,11 +58,35 @@ export const AEGIS_VAULT_ABI = [
     name: "routeYieldViaXCM",
     inputs: [
       { name: "destParachainId", type: "uint32" },
+      { name: "token", type: "address" },
       { name: "amount", type: "uint256" },
       { name: "aiRiskScore", type: "uint256" },
+      { name: "assetData", type: "bytes" },
+      { name: "feeAssetItem", type: "uint32" },
+      { name: "weightLimit", type: "uint64" },
     ],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "setXCMPrecompileAddress",
+    inputs: [{ name: "newXCMPrecompile", type: "address" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "xcmPrecompileAddress",
+    outputs: [{ type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTotalRouted",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -197,39 +221,30 @@ export const CONTRACT_ADDRESSES = {
     process.env.NEXT_PUBLIC_AEGIS_VAULT_ADDRESS,
     "0x0000000000000000000000000000000000000000"
   ),
-  DOT: resolveAddress(
-    process.env.NEXT_PUBLIC_DOT_TOKEN_ADDRESS,
+  // MVP Option A tokens (mock EVM addresses by design)
+  WPAS: resolveAddress(
+    process.env.NEXT_PUBLIC_WPAS_ADDRESS,
     "0x0000000000000000000000000000000000000000"
   ),
-  USDT: resolveAddress(
-    process.env.NEXT_PUBLIC_USDT_TOKEN_ADDRESS,
-    "0x0000000000000000000000000000000000000001"
-  ),
   USDC: resolveAddress(
-    process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS,
-    "0x0000000000000000000000000000000000000002"
+    process.env.NEXT_PUBLIC_TEST_USDC_ADDRESS ??
+      process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS,
+    "0x0000000000000000000000000000000000000000"
   ),
 } as const;
 
 // Supported tokens for deposit/withdrawal
 export const SUPPORTED_TOKENS = [
   {
-    symbol: "DOT",
-    name: "Polkadot",
-    address: CONTRACT_ADDRESSES.DOT,
-    decimals: 18,
-    icon: "🔵",
-  },
-  {
-    symbol: "USDT",
-    name: "Tether USD",
-    address: CONTRACT_ADDRESSES.USDT,
-    decimals: 6,
-    icon: "💵",
+    symbol: "wPAS",
+    name: "Wrapped PAS",
+    address: CONTRACT_ADDRESSES.WPAS,
+    decimals: 10,
+    icon: "🟪",
   },
   {
     symbol: "USDC",
-    name: "USD Coin",
+    name: "test-USDC (MVP token)",
     address: CONTRACT_ADDRESSES.USDC,
     decimals: 6,
     icon: "💳",

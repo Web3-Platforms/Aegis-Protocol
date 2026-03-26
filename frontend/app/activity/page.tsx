@@ -1,39 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { TransactionHistory } from "@/components/TransactionHistory";
 import { YieldStatistics } from "@/components/YieldStatistics";
-import { getTransactionStats } from "@/lib/mockData";
+import { useVaultActivityData } from "@/lib/useVaultActivityData";
 
 export default function ActivityPage() {
-  const [txStats, setTxStats] = useState({
-    totalDeposited: 0,
-    totalWithdrawn: 0,
-    totalYieldRouted: 0,
-    transactionCount: 0,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const txData = await getTransactionStats();
-        setTxStats(txData);
-      } catch (error) {
-        console.error("Failed to fetch stats:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
+  const {
+    isLoading,
+    stats,
+    yields,
+    transactions,
+    routedAssetAddress,
+    destinationParachainId,
+    destinationVaultAddress,
+  } = useVaultActivityData();
 
   const statCards = [
-    { label: "Total Transactions", value: `${txStats.transactionCount}`, note: "Tracked interactions", icon: "📊" },
-    { label: "Total Deposited", value: `${txStats.totalDeposited.toFixed(2)}`, note: "Tokens in vault", icon: "📥" },
-    { label: "Total Withdrawn", value: `${txStats.totalWithdrawn.toFixed(2)}`, note: "Tokens returned", icon: "📤" },
-    { label: "Yield Routed", value: `${txStats.totalYieldRouted.toFixed(2)}`, note: "Active yield", icon: "📈" },
+    { label: "Total Transactions", value: `${stats.transactionCount}`, note: "On-chain logs loaded", icon: "📊" },
+    { label: "Total Deposited", value: `${stats.totalDeposited.toFixed(2)} USDC`, note: "User deposit events", icon: "📥" },
+    { label: "Total Withdrawn", value: `${stats.totalWithdrawn.toFixed(2)} USDC`, note: "User withdrawal events", icon: "📤" },
+    { label: "Yield Routed", value: `${stats.totalYieldRouted.toFixed(2)} USDC`, note: "Route events emitted", icon: "📈" },
   ];
 
   return (
@@ -49,6 +35,9 @@ export default function ActivityPage() {
             </h1>
             <p className="text-lg text-muted-foreground font-medium max-w-2xl leading-relaxed">
               Comprehensive overview of your vault's performance, transaction history, and active yield strategies across the Polkadot ecosystem.
+            </p>
+            <p className="text-sm text-muted-foreground font-medium max-w-2xl leading-relaxed">
+              Data source: live contract events from the configured AegisVault on Paseo.
             </p>
           </div>
         </div>
@@ -72,12 +61,18 @@ export default function ActivityPage() {
 
         <div className="space-y-6">
           <h2 className="text-2xl font-bold tracking-tight">Yield Strategies</h2>
-          <YieldStatistics />
+          <YieldStatistics yields={yields} stats={stats} isLoading={isLoading} />
         </div>
 
         <div className="space-y-6">
           <h2 className="text-2xl font-bold tracking-tight">Recent Ledger</h2>
-          <TransactionHistory />
+          <TransactionHistory
+            transactions={transactions}
+            isLoading={isLoading}
+            routedAssetAddress={routedAssetAddress}
+            destinationParachainId={destinationParachainId}
+            destinationVaultAddress={destinationVaultAddress}
+          />
         </div>
 
         <div className="grid gap-8 md:grid-cols-2">

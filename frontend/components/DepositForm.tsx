@@ -24,6 +24,7 @@ export function DepositForm() {
   const [step, setStep] = useState<"idle" | "approving" | "depositing">("idle");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isRouting, setIsRouting] = useState(false);
 
   // ── Read wallet balance for the selected token ──────────────────────────
   const { data: rawBalance, refetch: refetchBalance } = useReadContract({
@@ -91,11 +92,61 @@ export function DepositForm() {
     if (isDepositConfirmed && step === "depositing") {
       setStep("idle");
       setDepositAmount("");
-      setSuccess("Deposit successful! Your assets are now earning yield.");
+
+      const baseSuccess = "Deposit successful! Your assets are now earning yield.";
+
       refetchBalance();
       refetchAllowance();
+      setSuccess(baseSuccess);
+
+      // MVP Option A: routing is triggered by the deposit (for the routed asset only).
+      // This calls the oracle/relay signing endpoint; if it isn't configured locally,
+      // the deposit still succeeds and routing will fail gracefully.
+      if (address && isConnected && selectedToken.symbol === "USDC") {
+        (async () => {
+          try {
+            setIsRouting(true);
+            const resp = await fetch("/api/execute-route", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userAddress: address,
+                intent: "deposit",
+              }),
+            });
+
+            const json = await resp.json();
+            if (!resp.ok) {
+              setSuccess(
+                `${baseSuccess}\nRouting not executed: ${json?.error ?? "unknown error"}`
+              );
+              return;
+            }
+
+            setSuccess(
+              `${baseSuccess}\nRoute execution submitted.\nTx: ${json.txHash}`
+            );
+          } catch (e) {
+            setSuccess(
+              `${baseSuccess}\nRouting not executed in this environment.`
+            );
+          } finally {
+            setIsRouting(false);
+          }
+        })();
+      } else {
+        setSuccess(baseSuccess);
+      }
     }
-  }, [isDepositConfirmed, step, refetchBalance, refetchAllowance]);
+  }, [
+    isDepositConfirmed,
+    step,
+    refetchBalance,
+    refetchAllowance,
+    address,
+    isConnected,
+    selectedToken.symbol,
+  ]);
 
   // ── Form handler ────────────────────────────────────────────────────────
   const handleDeposit = (e: React.FormEvent) => {
@@ -154,7 +205,8 @@ export function DepositForm() {
     isApprovePending ||
     isApproveConfirming ||
     isDepositPending ||
-    isDepositConfirming;
+    isDepositConfirming ||
+    isRouting;
 
   const buttonLabel = (() => {
     if (isApprovePending || isApproveConfirming) return "Approving…";
@@ -236,11 +288,13 @@ export function DepositForm() {
         <div className="p-4 rounded-xl bg-secondary/30 border border-dashed space-y-2">
           <div className="flex justify-between text-xs font-medium">
             <span className="text-muted-foreground">Estimated Yield</span>
-            <span className="text-green-600 font-bold">~12.4% APY</span>
+            <span className="text-muted-foreground font-bold">
+              Simulated for MVP beta
+            </span>
           </div>
           <div className="flex justify-between text-xs font-medium">
             <span className="text-muted-foreground">Security Rating</span>
-            <span className="text-indigo-600 font-bold">AAA (AI-Verified)</span>
+            <span className="text-indigo-600 font-bold">AI risk gate (prototype)</span>
           </div>
         </div>
 

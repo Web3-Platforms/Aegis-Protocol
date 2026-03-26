@@ -1,30 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getTransactions, type Transaction } from "@/lib/mockData";
+import { useMemo, useState } from "react";
+import type { ActivityTransaction } from "@/lib/useVaultActivityData";
 
-export function TransactionHistory() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+interface TransactionHistoryProps {
+  transactions?: ActivityTransaction[];
+  isLoading?: boolean;
+  routedAssetAddress?: string;
+  destinationParachainId?: number;
+  destinationVaultAddress?: string;
+}
+
+export function TransactionHistory({
+  transactions = [],
+  isLoading = false,
+  routedAssetAddress = "",
+  destinationParachainId = 1000,
+  destinationVaultAddress = "",
+}: TransactionHistoryProps) {
   const [filter, setFilter] = useState<"all" | "deposit" | "withdrawal" | "yield_routed">("all");
 
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const data = await getTransactions();
-        setTransactions(data);
-      } catch (error) {
-        console.error("Failed to fetch transactions:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTransactions();
-  }, []);
-
-  const filteredTransactions =
-    filter === "all" ? transactions : transactions.filter((tx) => tx.type === filter);
+  const filteredTransactions = useMemo(
+    () =>
+      filter === "all"
+        ? transactions
+        : transactions.filter((tx) => tx.type === filter),
+    [filter, transactions]
+  );
 
   const getTypeLabel = (type: string) => {
     switch (type) {
@@ -68,6 +70,15 @@ export function TransactionHistory() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Transaction History</h2>
           <p className="text-sm text-muted-foreground">Detailed ledger of your vault activity</p>
+          <p className="text-xs text-muted-foreground font-medium mt-1">
+            Source: on-chain `Deposit`, `Withdrawal`, and `YieldRoutedViaXCM` logs.
+          </p>
+          <p className="text-xs text-muted-foreground font-medium mt-1">
+            Route target: parachain {destinationParachainId} · vault {destinationVaultAddress.slice(0, 8)}...
+          </p>
+          <p className="text-xs text-muted-foreground font-medium mt-1">
+            Routed asset address: {routedAssetAddress}
+          </p>
         </div>
 
         <div className="flex p-1 bg-secondary/50 rounded-xl border w-fit">

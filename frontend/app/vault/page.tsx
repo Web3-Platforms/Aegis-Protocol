@@ -31,10 +31,9 @@ const guides = [
     title: "Supported Assets",
     icon: "💎",
     steps: [
-      "DOT (18 decimals)",
-      "USDT (6 decimals)",
-      "USDC (6 decimals)",
-      "Unified vault workflow.",
+      "wPAS (10 decimals)",
+      "test-USDC (6 decimals)",
+      "Unified vault workflow (MVP beta).",
     ],
   },
   {

@@ -29,7 +29,7 @@ const mockTransactions: Transaction[] = [
   {
     id: "tx_1",
     type: "deposit",
-    token: "DOT",
+    token: "USDC",
     amount: 100,
     timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
     status: "confirmed",
@@ -38,7 +38,7 @@ const mockTransactions: Transaction[] = [
   {
     id: "tx_2",
     type: "deposit",
-    token: "USDT",
+    token: "USDC",
     amount: 500,
     timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
     status: "confirmed",
@@ -47,7 +47,7 @@ const mockTransactions: Transaction[] = [
   {
     id: "tx_3",
     type: "yield_routed",
-    token: "DOT",
+    token: "USDC",
     amount: 25,
     timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000),
     status: "confirmed",
@@ -58,7 +58,7 @@ const mockTransactions: Transaction[] = [
   {
     id: "tx_4",
     type: "withdrawal",
-    token: "USDT",
+    token: "USDC",
     amount: 100,
     timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
     status: "confirmed",

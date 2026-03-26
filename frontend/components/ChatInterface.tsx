@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { parseEther } from "viem";
-import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount } from "wagmi";
 
 interface Message {
   id: string;
@@ -23,25 +22,21 @@ interface RiskOracleResponse {
 }
 
 export function ChatInterface() {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       type: "ai",
       content:
-        "Hello. I am Aegis, your AI-guarded yield assistant. Describe what you want to do with your DOT and I will assess the route before execution.",
+        "Hello. I am Aegis, your AI-guarded yield assistant. Describe what you want to do with your test-USDC and I will assess the route before execution.",
       timestamp: new Date(),
     },
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isExecutingRoute, setIsExecutingRoute] = useState(false);
   const [dismissedConfirmations, setDismissedConfirmations] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -65,7 +60,7 @@ export function ChatInterface() {
 
   const getParachainName = (parachainId: number): string => {
     const parachains: Record<number, string> = {
-      1000: "Statemine",
+      1000: "Paseo Asset Hub",
       2000: "Acala",
       2001: "Astar",
       2004: "Moonbeam",
@@ -110,7 +105,8 @@ export function ChatInterface() {
         const transactionMessage: Message = {
           id: (Date.now() + 2).toString(),
           type: "system",
-          content: "This route passed the risk gate. Would you like to execute the transaction?",
+          content:
+            "This route passed the risk gate. Confirm if you want to execute the transaction.",
           timestamp: new Date(),
           data: riskData,
         };
@@ -129,16 +125,54 @@ export function ChatInterface() {
     }
   };
 
-  const handleConfirmTransaction = (message: Message) => {
-    if (!message.data || !isConnected) return;
+  const handleConfirmTransaction = async (message: Message) => {
+    if (!message.data || !isConnected || !address) return;
+    setIsExecutingRoute(true);
 
-    writeContract({
-      address: "0x0000000000000000000000000000000000000000",
-      abi: [],
-      functionName: "mockTransaction",
-      args: [],
-      value: parseEther("0.01"),
-    });
+    try {
+      const resp = await fetch("/api/execute-route", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userAddress: address,
+          // risk gate is enforced again server-side; passing it speeds up orchestration.
+          riskScore: message.data.riskScore,
+          intent: message.content,
+        }),
+      });
+
+      const json = await resp.json();
+
+      if (!resp.ok) {
+        throw new Error(json?.error ?? "Execute route failed");
+      }
+
+      setDismissedConfirmations((prev) => [...prev, message.id]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${message.id}-submitted`,
+          type: "ai",
+          content: `Route execution submitted.\nTx: ${json.txHash}\nCheck Activity for ` +
+            `\`Deposit\` / \`YieldRoutedViaXCM\` events.`,
+          timestamp: new Date(),
+        },
+      ]);
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${message.id}-error`,
+          type: "ai",
+          content:
+            "Route execution could not be performed in this environment. " +
+            "Ensure the oracle/relay signing key is configured and that you have a non-zero deposited test-USDC balance.",
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setIsExecutingRoute(false);
+    }
   };
 
   const handleCancelTransaction = (message: Message) => {
@@ -214,20 +248,16 @@ export function ChatInterface() {
                       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                         <button
                           onClick={() => handleConfirmTransaction(message)}
-                          disabled={isPending || isConfirming}
+                          data-testid="confirm-transaction"
+                          disabled={isExecutingRoute}
                           className="aegis-button bg-emerald-600 text-white hover:bg-emerald-700 w-full text-xs py-1.5 h-auto rounded-lg"
                         >
-                          {isPending
-                            ? "Confirming..."
-                            : isConfirming
-                            ? "Processing..."
-                            : isSuccess
-                            ? "Completed"
-                            : "Execute Route"}
+                          {isExecutingRoute ? "Executing..." : "Execute Route"}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleCancelTransaction(message)}
+                          data-testid="cancel-transaction"
                           className="aegis-button bg-white text-zinc-900 border hover:bg-zinc-50 w-full text-xs py-1.5 h-auto rounded-lg"
                         >
                           Decline
@@ -268,11 +298,13 @@ export function ChatInterface() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Type your DeFi intent..."
+            data-testid="chat-intent-input"
             className="aegis-input w-full pr-24 h-12 rounded-xl focus-visible:ring-primary/20"
             disabled={isLoading}
           />
           <button
             type="submit"
+            data-testid="chat-send-button"
             disabled={!inputValue.trim() || isLoading}
             className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 px-4 bg-primary text-primary-foreground rounded-lg font-bold text-xs shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all"
           >

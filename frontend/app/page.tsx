@@ -87,8 +87,10 @@ export default function Home() {
           <div className="space-y-4 md:border-x px-0 md:px-8">
             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Total Value Guarded</p>
             <div className="flex items-end gap-2">
-              <p className="text-4xl font-black tracking-tight">$24,192.40</p>
-              <p className="text-sm font-bold text-green-600 pb-1">+12.4%</p>
+              <p className="text-4xl font-black tracking-tight">—</p>
+              <p className="text-sm font-bold text-muted-foreground pb-1">
+                MVP beta (simulated)
+              </p>
             </div>
           </div>
 

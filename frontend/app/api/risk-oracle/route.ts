@@ -1,22 +1,12 @@
 import { NextResponse } from "next/server";
 
-const parachains: Record<string, number> = {
-  acala: 2000,
-  astar: 2001,
-  moonbeam: 2004,
-  parallel: 2012,
-  heiko: 2085,
-  picasso: 2087,
-  bifrost: 2092,
-};
+// MVP Option A hard-codes the destination to Paseo Asset Hub (destParachainId=1000).
+// We intentionally keep the risk scoring logic, but remove destination variability so MVP scope stays honest.
+const DEST_PARACHAIN_ID = Number(process.env.DEST_PARACHAIN_ID ?? 1000);
 
 export async function POST(request: Request) {
   const { intent } = await request.json();
   const normalizedIntent = String(intent ?? "").toLowerCase();
-
-  const matchedParachain =
-    Object.entries(parachains).find(([name]) => normalizedIntent.includes(name)) ??
-    ["acala", 2000];
 
   const looksHighRisk =
     normalizedIntent.includes("leverage") ||
@@ -27,7 +17,7 @@ export async function POST(request: Request) {
   const riskScore = looksHighRisk ? 88 : 42;
 
   return NextResponse.json({
-    parachainId: matchedParachain[1],
+    parachainId: DEST_PARACHAIN_ID,
     riskScore,
     safeToRoute: riskScore < 75,
   });
