@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { http, createPublicClient, createWalletClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { AEGIS_VAULT_ABI, CONTRACT_ADDRESSES } from "@/lib/contracts";
+import { 
+  encodeAssetDataForXCM, 
+  AssetType
+} from "@/lib/xcm-encoder";
 
 const PAS_RPC_URL =
   process.env.NEXT_PUBLIC_PASEO_RPC_URL ?? "https://eth-rpc-testnet.polkadot.io";
@@ -35,19 +39,26 @@ function computeRiskScore(intent: string) {
 }
 
 /**
- * Encode asset data for XCM transfer
- * This creates a MultiAsset encoding for the XCM precompile
+ * Encode asset data for XCM transfer using dynamic encoder
+ * This creates a proper MultiAsset encoding for the XCM precompile
+ * Supports multiple asset types: Native (0) and Wrapper/Mapped (1)
+ * 
  * @param tokenAddress The ERC20 token address
  * @param amount The amount to transfer
+ * @param destParachainId The destination parachain ID
+ * @param assetType The asset type (0=Native, 1=Wrapper/Mapped)
+ * @param assetId Optional asset ID for wrapper/mapped assets
  * @returns Encoded bytes for XCM asset data
  */
-function encodeAssetData(tokenAddress: string, amount: bigint): `0x${string}` {
-  // For MVP: Use a simple encoding format
-  // In production, this would be a proper XCM MultiAsset encoding
-  // Format: tokenAddress (32 bytes) + amount (32 bytes)
-  const tokenPadded = tokenAddress.toLowerCase().slice(2).padStart(64, "0");
-  const amountHex = amount.toString(16).padStart(64, "0");
-  return `0x${tokenPadded}${amountHex}` as `0x${string}`;
+function encodeAssetData(
+  tokenAddress: string, 
+  amount: bigint, 
+  destParachainId: number,
+  assetType: AssetType = AssetType.WRAPPER_MAPPED,
+  assetId?: number
+): `0x${string}` {
+  // Use the dynamic XCM encoder for proper Scale encoding based on asset type
+  return encodeAssetDataForXCM(tokenAddress, amount, destParachainId, assetType, assetId);
 }
 
 export async function POST(request: Request) {
@@ -59,6 +70,13 @@ export async function POST(request: Request) {
     const assetDataOverride = body?.assetData as string | undefined;
     const feeAssetItem = body?.feeAssetItem as number | undefined;
     const weightLimit = body?.weightLimit as number | undefined;
+    
+    // Multi-asset support: assetType (0=Native, 1=Wrapper/Mapped)
+    const assetTypeInput = body?.assetType as number | undefined;
+    const assetType: AssetType = assetTypeInput === 0 ? AssetType.NATIVE : AssetType.WRAPPER_MAPPED;
+    
+    // Optional asset ID for wrapper/mapped assets (e.g., Statemine asset ID)
+    const assetId = body?.assetId as number | undefined;
 
     if (!userAddress) {
       return NextResponse.json(
@@ -130,7 +148,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Prepare assetData - use provided value or encode from token/amount
+    // Prepare assetData - use provided value or encode from token/amount/assetType
     let assetData: `0x${string}`;
     if (assetDataOverride) {
       // Validate that assetData is a valid hex string
@@ -142,8 +160,8 @@ export async function POST(request: Request) {
       }
       assetData = assetDataOverride as `0x${string}`;
     } else {
-      // Encode asset data from token address and amount
-      assetData = encodeAssetData(testUsdcAddress, amount);
+      // Encode asset data from token address, amount, and asset type using dynamic encoder
+      assetData = encodeAssetData(testUsdcAddress, amount, destParachainId, assetType, assetId);
     }
 
     // Use provided feeAssetItem and weightLimit or defaults
@@ -157,6 +175,7 @@ export async function POST(request: Request) {
       transport: http(PAS_RPC_URL),
     });
 
+    // Call routeYieldViaXCM with assetType parameter
     const txHash = await walletClient.writeContract({
       address: vaultAddress,
       abi: AEGIS_VAULT_ABI,
@@ -169,6 +188,7 @@ export async function POST(request: Request) {
         assetData,
         finalFeeAssetItem,
         BigInt(finalWeightLimit),
+        assetType, // Pass assetType to the contract
       ],
       chain: paseoTestnet as any,
     });
@@ -179,6 +199,8 @@ export async function POST(request: Request) {
       amount: amount.toString(),
       riskScore,
       assetData,
+      assetType,
+      assetId,
       feeAssetItem: finalFeeAssetItem,
       weightLimit: finalWeightLimit,
     });

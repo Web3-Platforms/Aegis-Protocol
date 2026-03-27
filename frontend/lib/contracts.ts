@@ -64,9 +64,51 @@ export const AEGIS_VAULT_ABI = [
       { name: "assetData", type: "bytes" },
       { name: "feeAssetItem", type: "uint32" },
       { name: "weightLimit", type: "uint64" },
+      { name: "assetType", type: "uint8" },
     ],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getTotalRoutedByAssetType",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "assetType", type: "uint8" },
+    ],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "setRouteCapByAssetType",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "assetType", type: "uint8" },
+      { name: "cap", type: "uint256" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "totalRoutedByAssetType",
+    inputs: [
+      { type: "address" },
+      { type: "uint8" },
+    ],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "routeCapsByAssetType",
+    inputs: [
+      { type: "address" },
+      { type: "uint8" },
+    ],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
   },
   {
     type: "function",

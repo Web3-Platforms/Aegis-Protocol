@@ -13,16 +13,24 @@ describe("AegisVault gas profile", function () {
     );
     await mockToken.waitForDeployment();
 
+    // Deploy MockXCM for testing
+    const MockXCM = await ethers.getContractFactory("contracts/test/MockXCM.sol:MockXCM");
+    const mockXCM = await MockXCM.deploy();
+    await mockXCM.waitForDeployment();
+
     const AegisVault = await ethers.getContractFactory("AegisVault");
     const aegisVault = await AegisVault.deploy(owner.address, aiOracle.address);
     await aegisVault.waitForDeployment();
+
+    // Set MockXCM as the XCM precompile address
+    await aegisVault.setXCMPrecompileAddress(await mockXCM.getAddress());
 
     await mockToken.mint(user.address, ethers.parseEther("1000"));
     await mockToken
       .connect(user)
       .approve(await aegisVault.getAddress(), ethers.MaxUint256);
 
-    return { aegisVault, mockToken, owner, aiOracle, user };
+    return { aegisVault, mockToken, mockXCM, owner, aiOracle, user };
   }
 
   async function expectUnderGas(txPromise, limit, label) {
@@ -61,9 +69,13 @@ describe("AegisVault gas profile", function () {
       "withdraw"
     );
 
+    const assetData = "0x1234";
+    const feeAssetItem = 0;
+    const weightLimit = 1000000;
+    const assetType = 1; // Wrapper/Mapped
     await expectUnderGas(
-      aegisVault.connect(aiOracle).routeYieldViaXCM(2000, ethers.parseEther("5"), 35),
-      200000n,
+      aegisVault.connect(aiOracle).routeYieldViaXCM(2000, tokenAddress, ethers.parseEther("5"), 35, assetData, feeAssetItem, weightLimit, assetType),
+      300000n,
       "routeYieldViaXCM"
     );
   });

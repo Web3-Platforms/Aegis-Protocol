@@ -1,7 +1,7 @@
 # AegisVault XCM Integration - Project Report
 
 **Date:** March 26, 2026  
-**Project:** Aegis Protocol - Cross-Chain Yield Vault  
+**Project:** Aegis Protocol - Cross-Chain Yield Vault
 **Status:** MVP Complete with XCM Routing Foundation
 
 ---
@@ -64,7 +64,8 @@ function routeYieldViaXCM(
     uint256 aiRiskScore,
     bytes calldata assetData,
     uint32 feeAssetItem,
-    uint64 weightLimit
+    uint64 weightLimit,
+    uint8 assetType
 ) external onlyAIOracle nonReentrant
 ```
 
@@ -78,6 +79,7 @@ function routeYieldViaXCM(
 | `assetData` | bytes | Encoded asset data for XCM (MultiAsset encoding) |
 | `feeAssetItem` | uint32 | Index of the fee asset in assetData |
 | `weightLimit` | uint64 | Weight limit for XCM execution |
+| `assetType` | uint8 | Asset type (0=Native, 1=Wrapper/Mapped) |
 
 **Validation Logic:**
 - Only callable by configured AI Oracle
@@ -85,6 +87,46 @@ function routeYieldViaXCM(
 - Amount must be > 0
 - Token must be supported
 - Vault must have sufficient balance
+- Route cap must not be exceeded
+- XCM routing must not be paused
+
+### 2.2 Audit-Ready Event Logging (AEGIS-106)
+
+**XcmRouted Event:**
+```solidity
+event XcmRouted(
+    uint32 indexed targetChainId,
+    address indexed token,
+    uint256 amount,
+    uint256 indexed parachainNonce,
+    bytes32 txHash,
+    uint256 riskScore,
+    uint8 assetType,
+    uint256 timestamp
+);
+```
+
+**Purpose:** Provides audit-ready logging for multi-chain tracking and Subscan indexing.
+
+**Parameters:**
+| Parameter | Type | Indexed | Description |
+|-----------|------|---------|-------------|
+| `targetChainId` | uint32 | Yes | Destination parachain ID |
+| `token` | address | Yes | ERC20 token address routed |
+| `amount` | uint256 | No | Amount routed |
+| `parachainNonce` | uint256 | Yes | Per-chain message nonce for ordering |
+| `txHash` | bytes32 | No | Unique transaction hash for cross-chain correlation |
+| `riskScore` | uint256 | No | AI-calculated risk score |
+| `assetType` | uint8 | No | Asset classification (Native/Wrapper) |
+| `timestamp` | uint256 | No | Block timestamp |
+
+**Parachain Nonce Tracking:**
+```solidity
+mapping(uint32 => uint256) public parachainNonces;
+```
+- Nonces are tracked independently per destination chain
+- Enables ordered message verification on destination parachains
+- Supports Subscan and other block explorers for audit trails
 
 ### 2.2 Accounting Logic (totalRouted)
 
@@ -254,18 +296,28 @@ function encodeAssetData(tokenAddress: string, amount: bigint): `0x${string}` {
    - [x] Configurable XCM precompile address
    - [x] IPolkadotXCM interface integration
    - [x] Compiles with Solidity 0.8.x
+   - [x] **AEGIS-106: Audit-ready XcmRouted event with txHash and parachainNonce**
+   - [x] Per-chain nonce tracking for multi-chain verification
+   - [x] Subscan-compatible indexed events
 
 2. **Testing Infrastructure**
    - [x] MockXCM.sol created for XCM simulation
-   - [x] 34 Hardhat tests passing
+   - [x] 34+ Hardhat tests passing
    - [x] Tests verify `sendXcm` invocation
    - [x] Reentrancy protection validated
+   - [x] **AEGIS-106: Tests verify XcmRouted event parameters**
+   - [x] Parachain nonce increment verification
 
 3. **API Integration**
    - [x] `/api/execute-route` accepts `assetData` bytes
    - [x] Endpoint maps requests to AegisVault transactions
    - [x] Placeholder encoding implemented
    - [x] Risk score validation integrated
+
+4. **Live Testing Suite**
+   - [x] **AEGIS-106: Live script logs audit-ready parameters**
+   - [x] XcmRouted event parsing and display
+   - [x] Parachain nonce tracking verification
 
 ---
 

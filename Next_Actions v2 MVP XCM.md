@@ -250,10 +250,125 @@ Extend the vault to support multiple token types for XCM routing. Currently, the
 
 ---
 
-### 🟢 Issue: AEGIS-106 - Implement AI Risk Score Oracle Integration
+### ✅ Issue: AEGIS-106 - Implement Audit-Ready Event Logging for XCM Routing
 
 **Type:** Story  
-**Priority:** Low  
+**Status:** COMPLETED ✅  
+**Priority:** High  
+**Component:** Smart Contract  
+**Assignee:** Completed  
+**Sprint:** Current
+
+#### Description
+Implement enhanced event logging for XCM routing operations to support multi-chain tracking, Subscan indexing, and audit requirements. The XcmRouted event includes txHash and parachainNonce for cross-chain correlation.
+
+#### Implementation Summary
+
+**New Event Added:**
+```solidity
+event XcmRouted(
+    uint32 indexed targetChainId,
+    address indexed token,
+    uint256 amount,
+    uint256 indexed parachainNonce,
+    bytes32 txHash,
+    uint256 riskScore,
+    uint8 assetType,
+    uint256 timestamp
+);
+```
+
+**State Variable Added:**
+```solidity
+mapping(uint32 => uint256) public parachainNonces;
+```
+
+**Key Features:**
+- ✅ Per-chain nonce tracking for ordered message verification
+- ✅ Indexed parameters for efficient Subscan queries
+- ✅ Unique txHash for cross-chain correlation
+- ✅ Backward compatible with existing events
+
+#### Acceptance Criteria
+- [x] XcmRouted event emits with all audit-ready parameters
+- [x] parachainNonces mapping tracks nonces per destination chain
+- [x] Hardhat tests verify event emission with correct parameters
+- [x] Live script logs XcmRouted event details
+- [x] Documentation updated with new event schema
+
+#### Files Modified
+- `contracts/contracts/AegisVault.sol` - Added XcmRouted event and parachainNonces
+- `contracts/test/AegisVault.test.js` - Added tests for XcmRouted event
+- `contracts/scripts/live-xcm-test.js` - Added event parsing and logging
+- `Project_Report v2 MVP XCM.md` - Updated documentation
+
+---
+
+### 🔴 Issue: AEGIS-107 - Production Readiness & Security Audit
+
+**Type:** Epic  
+**Priority:** High  
+**Component:** All  
+**Assignee:** TBD  
+**Sprint:** Next
+
+#### Description
+Prepare AegisVault for production deployment with comprehensive security audit, formal verification, and mainnet readiness. This epic encompasses all remaining work to transition from MVP to production.
+
+#### Dependencies
+- AEGIS-101: Production XCM MultiAsset Encoding
+- AEGIS-102: Live Parachain Testing
+- AEGIS-103: Function Signature Refinement
+- AEGIS-106: Audit-Ready Event Logging ✅ COMPLETED
+
+#### Phase 1: Security Hardening
+
+**AEGIS-107.1 - Implement Formal Verification**
+- Use Certora or similar for formal verification of critical functions
+- Verify routeYieldViaXCM invariants
+- Verify accounting correctness
+
+**AEGIS-107.2 - Security Audit Preparation**
+- Document all external calls and trust assumptions
+- Create security checklist
+- Prepare audit scope document
+
+**AEGIS-107.3 - Emergency Response Procedures**
+- Document circuit breaker usage
+- Create incident response playbook
+- Set up monitoring and alerting
+
+#### Phase 2: Production Deployment
+
+**AEGIS-107.4 - Mainnet Deployment Plan**
+- Deployment checklist
+- Rollback procedures
+- Monitoring setup
+
+**AEGIS-107.5 - Documentation Finalization**
+- API documentation
+- Integration guides
+- Security best practices
+
+#### Acceptance Criteria
+- [ ] Formal verification reports generated
+- [ ] Security audit completed with all findings addressed
+- [ ] Emergency procedures documented and tested
+- [ ] Mainnet deployment executed successfully
+- [ ] Monitoring and alerting operational
+
+#### Estimated Effort
+- **Security Audit:** 2 weeks
+- **Formal Verification:** 1 week
+- **Deployment:** 3 days
+- **Documentation:** 3 days
+
+---
+
+### 🔴 Issue: AEGIS-108 - Implement AI Risk Score Oracle Integration
+
+**Type:** Story  
+**Priority:** Medium  
 **Component:** Off-chain / AI  
 **Assignee:** TBD  
 **Sprint:** Backlog

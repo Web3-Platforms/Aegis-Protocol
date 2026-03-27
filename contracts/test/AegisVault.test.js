@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
 async function deployFixture() {
   const [owner, aiOracle, user1, user2, outsider] = await ethers.getSigners();
@@ -13,7 +14,7 @@ async function deployFixture() {
   await mockToken.waitForDeployment();
 
   // Deploy MockXCM for testing
-  const MockXCM = await ethers.getContractFactory("MockXCM");
+  const MockXCM = await ethers.getContractFactory("contracts/test/MockXCM.sol:MockXCM");
   const mockXCM = await MockXCM.deploy();
   await mockXCM.waitForDeployment();
 
@@ -184,7 +185,8 @@ describe("AegisVault", function () {
           42,
           assetData,
           0,
-          1000000
+          1000000,
+          1 // assetType: Wrapper/Mapped
         )
       ).to.emit(aegisVault, "YieldRoutedViaXCM");
 
@@ -196,7 +198,8 @@ describe("AegisVault", function () {
           42,
           assetData,
           0,
-          1000000
+          1000000,
+          1 // assetType: Wrapper/Mapped
         )
       )
         .to.be.revertedWithCustomError(aegisVault, "OnlyAIOracle")
@@ -366,11 +369,122 @@ describe("AegisVault", function () {
           74,
           assetData,
           0,
-          1000000
+          1000000,
+          1 // assetType: Wrapper/Mapped
         )
       )
         .to.emit(aegisVault, "YieldRoutedViaXCM")
         .withArgs(2004, await mockToken.getAddress(), amount, 74, assetData, anyUint());
+    });
+
+    it("emits XcmRouted event with txHash and parachainNonce for audit tracking", async function () {
+      const { aegisVault, mockToken, aiOracle, user1 } = await deployFixture();
+      const amount = ethers.parseEther("10");
+      const assetData = "0x1234abcd";
+      const destParachainId = 2004;
+      const assetType = 1; // Wrapper/Mapped
+      const riskScore = 74;
+
+      // Deposit tokens first
+      await aegisVault.connect(user1).deposit(await mockToken.getAddress(), amount);
+
+      // Get initial nonce
+      const initialNonce = await aegisVault.parachainNonces(destParachainId);
+      expect(initialNonce).to.equal(0n);
+
+      // Execute route and capture transaction
+      const tx = await aegisVault.connect(aiOracle).routeYieldViaXCM(
+        destParachainId,
+        await mockToken.getAddress(),
+        amount,
+        riskScore,
+        assetData,
+        0,
+        1000000,
+        assetType
+      );
+      const receipt = await tx.wait();
+
+      // Verify XcmRouted event was emitted with correct parameters
+      await expect(tx)
+        .to.emit(aegisVault, "XcmRouted")
+        .withArgs(
+          destParachainId,
+          await mockToken.getAddress(),
+          amount,
+          initialNonce, // parachainNonce should be 0 for first route
+          anyValue, // txHash (bytes32) - computed hash
+          riskScore,
+          assetType,
+          anyUint() // timestamp
+        );
+
+      // Verify nonce was incremented
+      const newNonce = await aegisVault.parachainNonces(destParachainId);
+      expect(newNonce).to.equal(1n);
+
+      // Verify nonce increments per destination
+      await aegisVault.connect(aiOracle).routeYieldViaXCM(
+        destParachainId,
+        await mockToken.getAddress(),
+        amount,
+        riskScore,
+        assetData,
+        0,
+        1000000,
+        assetType
+      );
+      const finalNonce = await aegisVault.parachainNonces(destParachainId);
+      expect(finalNonce).to.equal(2n);
+    });
+
+    it("tracks parachain nonces independently per destination chain", async function () {
+      const { aegisVault, mockToken, aiOracle, user1 } = await deployFixture();
+      const amount = ethers.parseEther("10");
+      const assetData = "0x1234abcd";
+
+      // Deposit tokens first
+      await aegisVault.connect(user1).deposit(await mockToken.getAddress(), ethers.parseEther("100"));
+
+      // Route to parachain 2000
+      await aegisVault.connect(aiOracle).routeYieldViaXCM(
+        2000,
+        await mockToken.getAddress(),
+        amount,
+        50,
+        assetData,
+        0,
+        1000000,
+        0
+      );
+
+      // Route to parachain 2004
+      await aegisVault.connect(aiOracle).routeYieldViaXCM(
+        2004,
+        await mockToken.getAddress(),
+        amount,
+        50,
+        assetData,
+        0,
+        1000000,
+        0
+      );
+
+      // Route to parachain 2000 again
+      await aegisVault.connect(aiOracle).routeYieldViaXCM(
+        2000,
+        await mockToken.getAddress(),
+        amount,
+        50,
+        assetData,
+        0,
+        1000000,
+        0
+      );
+
+      // Verify nonces are tracked independently
+      expect(await aegisVault.parachainNonces(2000)).to.equal(2n);
+      expect(await aegisVault.parachainNonces(2004)).to.equal(1n);
     });
 
     it("rejects routing when the caller is not the oracle", async function () {
@@ -385,7 +499,8 @@ describe("AegisVault", function () {
           10,
           assetData,
           0,
-          1000000
+          1000000,
+          0 // assetType: Native
         )
       )
         .to.be.revertedWithCustomError(aegisVault, "OnlyAIOracle")
@@ -404,7 +519,8 @@ describe("AegisVault", function () {
           75,
           assetData,
           0,
-          1000000
+          1000000,
+          0 // assetType: Native
         )
       )
         .to.be.revertedWithCustomError(aegisVault, "RiskScoreTooHigh")
@@ -418,7 +534,8 @@ describe("AegisVault", function () {
           99,
           assetData,
           0,
-          1000000
+          1000000,
+          0 // assetType: Native
         )
       )
         .to.be.revertedWithCustomError(aegisVault, "RiskScoreTooHigh")
@@ -437,7 +554,8 @@ describe("AegisVault", function () {
           10,
           assetData,
           0,
-          1000000
+          1000000,
+          0 // assetType: Native
         )
       ).to.be.revertedWithCustomError(aegisVault, "AmountMustBeGreaterThanZero");
     });
@@ -455,7 +573,8 @@ describe("AegisVault", function () {
           10,
           assetData,
           0,
-          1000000
+          1000000,
+          0 // assetType: Native
         )
       )
         .to.be.revertedWithCustomError(aegisVault, "TokenNotSupported")
@@ -475,20 +594,299 @@ describe("AegisVault", function () {
           10,
           assetData,
           0,
-          1000000
+          1000000,
+          0 // assetType: Native
         )
       )
         .to.be.revertedWithCustomError(aegisVault, "InsufficientRoutedBalance")
         .withArgs(await mockToken.getAddress(), 0n, requestedAmount);
     });
 
-    it("should trigger XCM call on routing", async function () {
+    it("rejects routing when XCM routing is paused (circuit breaker)", async function () {
+      const { aegisVault, mockToken, aiOracle, owner, user1 } = await deployFixture();
+      const assetData = "0x1234";
+      const amount = ethers.parseEther("10");
+
+      // Deposit tokens first
+      await aegisVault.connect(user1).deposit(await mockToken.getAddress(), amount);
+
+      // Pause XCM routing
+      await expect(aegisVault.connect(owner).toggleXcmRoute())
+        .to.emit(aegisVault, "XCMRoutingToggled")
+        .withArgs(true, owner.address);
+
+      // Verify routing is paused
+      expect(await aegisVault.xcmRoutingPaused()).to.equal(true);
+
+      // Try to route while paused - should fail
+      await expect(
+        aegisVault.connect(aiOracle).routeYieldViaXCM(
+          2000,
+          await mockToken.getAddress(),
+          amount,
+          50,
+          assetData,
+          0,
+          1000000,
+          0 // assetType: Native
+        )
+      ).to.be.revertedWithCustomError(aegisVault, "XCMRoutingPaused");
+
+      // Unpause and verify routing works again
+      await aegisVault.connect(owner).toggleXcmRoute();
+      expect(await aegisVault.xcmRoutingPaused()).to.equal(false);
+
+      // Now routing should succeed
+      await expect(
+        aegisVault.connect(aiOracle).routeYieldViaXCM(
+          2000,
+          await mockToken.getAddress(),
+          amount,
+          50,
+          assetData,
+          0,
+          1000000,
+          0 // assetType: Native
+        )
+      ).to.emit(aegisVault, "YieldRoutedViaXCM");
+    });
+
+    it("rejects routing when route cap is exceeded", async function () {
+      const { aegisVault, mockToken, aiOracle, owner, user1 } = await deployFixture();
+      const tokenAddress = await mockToken.getAddress();
+      const assetData = "0x1234";
+      const depositAmount = ethers.parseEther("100");
+      const capAmount = ethers.parseEther("50");
+      const routeAmount = ethers.parseEther("60");
+
+      // Deposit tokens
+      await aegisVault.connect(user1).deposit(tokenAddress, depositAmount);
+
+      // Set route cap
+      await expect(aegisVault.connect(owner).setRouteCap(tokenAddress, capAmount))
+        .to.emit(aegisVault, "RouteCapUpdated")
+        .withArgs(tokenAddress, capAmount);
+
+      // Verify cap is set
+      expect(await aegisVault.routeCaps(tokenAddress)).to.equal(capAmount);
+
+      // Try to route more than cap - should fail
+      await expect(
+        aegisVault.connect(aiOracle).routeYieldViaXCM(
+          2000,
+          tokenAddress,
+          routeAmount,
+          50,
+          assetData,
+          0,
+          1000000,
+          0 // assetType: Native
+        )
+      )
+        .to.be.revertedWithCustomError(aegisVault, "RouteCapExceeded")
+        .withArgs(tokenAddress, routeAmount, capAmount);
+
+      // Route within cap should succeed
+      const validRouteAmount = ethers.parseEther("30");
+      await expect(
+        aegisVault.connect(aiOracle).routeYieldViaXCM(
+          2000,
+          tokenAddress,
+          validRouteAmount,
+          50,
+          assetData,
+          0,
+          1000000,
+          0 // assetType: Native
+        )
+      ).to.emit(aegisVault, "YieldRoutedViaXCM");
+
+      // Verify totalRouted updated
+      expect(await aegisVault.totalRouted(tokenAddress)).to.equal(validRouteAmount);
+
+      // Try to route again - cumulative amount would exceed cap
+      await expect(
+        aegisVault.connect(aiOracle).routeYieldViaXCM(
+          2000,
+          tokenAddress,
+          validRouteAmount,
+          50,
+          assetData,
+          0,
+          1000000,
+          0 // assetType: Native
+        )
+      )
+        .to.be.revertedWithCustomError(aegisVault, "RouteCapExceeded")
+        .withArgs(tokenAddress, validRouteAmount * 2n, capAmount);
+    });
+
+    it("allows owner to set route cap to zero (no cap)", async function () {
+      const { aegisVault, mockToken, aiOracle, owner, user1 } = await deployFixture();
+      const tokenAddress = await mockToken.getAddress();
+      const assetData = "0x1234";
+      const depositAmount = ethers.parseEther("1000");
+      const routeAmount = ethers.parseEther("500");
+
+      // Deposit tokens
+      await aegisVault.connect(user1).deposit(tokenAddress, depositAmount);
+
+      // Set cap to zero (no limit)
+      await aegisVault.connect(owner).setRouteCap(tokenAddress, 0);
+      expect(await aegisVault.routeCaps(tokenAddress)).to.equal(0);
+
+      // Routing any amount should succeed
+      await expect(
+        aegisVault.connect(aiOracle).routeYieldViaXCM(
+          2000,
+          tokenAddress,
+          routeAmount,
+          50,
+          assetData, 0, 1000000, 1)
+      ).to.emit(aegisVault, "YieldRoutedViaXCM");
+    });
+
+    it("rejects non-owners from setting route cap", async function () {
+      const { aegisVault, mockToken, user1 } = await deployFixture();
+      const tokenAddress = await mockToken.getAddress();
+
+      await expect(
+        aegisVault.connect(user1).setRouteCap(tokenAddress, ethers.parseEther("100"))
+      )
+        .to.be.revertedWithCustomError(aegisVault, "OwnableUnauthorizedAccount")
+        .withArgs(user1.address);
+    });
+
+    it("rejects non-owners from toggling XCM route", async function () {
+      const { aegisVault, user1 } = await deployFixture();
+
+      await expect(aegisVault.connect(user1).toggleXcmRoute())
+        .to.be.revertedWithCustomError(aegisVault, "OwnableUnauthorizedAccount")
+        .withArgs(user1.address);
+    });
+
+    it("rejects setting route cap for zero address", async function () {
+      const { aegisVault, owner } = await deployFixture();
+
+      await expect(
+        aegisVault.connect(owner).setRouteCap(ethers.ZeroAddress, ethers.parseEther("100"))
+      ).to.be.revertedWithCustomError(aegisVault, "InvalidTokenAddress");
+    });
+
+
+    it("should increment totalRouted with valid encoded asset data", async function () {
+      const { aegisVault, mockToken, mockXCM, aiOracle, user1 } = await deployFixture();
+      const tokenAddress = await mockToken.getAddress();
+      const depositAmount = ethers.parseEther("100");
+      const routeAmount = ethers.parseEther("25");
+      const destParachainId = 1000; // Paseo Asset Hub
+
+      // Create valid XCM-encoded asset data
+      // Format: version(1) + parents(1) + interior(X2) + assetType(1) + amount(16)
+      // This follows the Polkadot XCM MultiAsset encoding spec
+      const version = "02"; // XCM V2
+      const parents = "00"; // Local chain
+      const interior = "01"; // X2 variant
+      const palletInstance = "30"; // PalletInstance(48) - ERC20
+      const accountKey20 = "02"; // AccountKey20 type
+      const tokenPadded = tokenAddress.toLowerCase().slice(2).padStart(40, "0");
+      const assetType = "00"; // Fungible
+      const amountHex = routeAmount.toString(16).padStart(32, "0");
+      // Convert to little-endian
+      const amountLE = amountHex.match(/.{2}/g).reverse().join("");
+      
+      const assetData = `0x${version}${parents}${interior}${palletInstance}${accountKey20}${tokenPadded}${assetType}${amountLE}`;
+
+      // Deposit tokens first
+      await aegisVault.connect(user1).deposit(tokenAddress, depositAmount);
+
+      // Verify initial state
+      expect(await aegisVault.getTotalRouted(tokenAddress)).to.equal(0n);
+
+      // Execute routing with encoded asset data
+      await expect(
+        aegisVault.connect(aiOracle).routeYieldViaXCM(
+          destParachainId,
+          tokenAddress,
+          routeAmount,
+          42, // Valid risk score
+          assetData,
+          0, // feeAssetItem
+          1000000, // weightLimit
+          0  // assetType: Native
+        )
+      )
+        .to.emit(aegisVault, "YieldRoutedViaXCM")
+        .withArgs(destParachainId, tokenAddress, routeAmount, 42, assetData, anyUint());
+
+      // Verify totalRouted was incremented
+      expect(await aegisVault.getTotalRouted(tokenAddress)).to.equal(routeAmount);
+
+      // Verify XCM was called with correct parameters
+      const lastCall = await mockXCM.getLastCall();
+      expect(lastCall.parachainId).to.equal(destParachainId);
+      expect(lastCall.assets).to.equal(assetData);
+    });
+
+    it("should handle multiple routing operations with totalRouted accounting", async function () {
+      const { aegisVault, mockToken, mockXCM, aiOracle, user1, user2 } = await deployFixture();
+      const tokenAddress = await mockToken.getAddress();
+      
+      // Setup: deposits from multiple users
+      await aegisVault.connect(user1).deposit(tokenAddress, ethers.parseEther("100"));
+      await aegisVault.connect(user2).deposit(tokenAddress, ethers.parseEther("50"));
+
+      // Create encoded asset data for multiple routing operations
+      const routeAmount1 = ethers.parseEther("30");
+      const routeAmount2 = ethers.parseEther("20");
+      const destParachainId = 2004;
+
+      // First routing with encoded asset data
+      const assetData1 = `0x02${tokenAddress.toLowerCase().slice(2)}${routeAmount1.toString(16).padStart(64, "0")}`;
+      await aegisVault.connect(aiOracle).routeYieldViaXCM(
+        destParachainId,
+        tokenAddress,
+        routeAmount1,
+        40,
+        assetData1, 0, 1000000, 1);
+
+      // Verify first routing
+      expect(await aegisVault.getTotalRouted(tokenAddress)).to.equal(routeAmount1);
+
+      // Second routing with different encoded asset data
+      const assetData2 = `0x02${tokenAddress.toLowerCase().slice(2)}${routeAmount2.toString(16).padStart(64, "0")}`;
+      await aegisVault.connect(aiOracle).routeYieldViaXCM(
+        destParachainId,
+        tokenAddress,
+        routeAmount2,
+        35,
+        assetData2, 0, 1000000, 1);
+
+      // Verify cumulative totalRouted
+      expect(await aegisVault.getTotalRouted(tokenAddress)).to.equal(
+        routeAmount1 + routeAmount2
+      );
+
+      // Verify deposits remain unchanged
+      expect(await aegisVault.getUserDeposit(user1.address, tokenAddress)).to.equal(
+        ethers.parseEther("100")
+      );
+      expect(await aegisVault.getUserDeposit(user2.address, tokenAddress)).to.equal(
+        ethers.parseEther("50")
+      );
+      expect(await aegisVault.totalDeposits(tokenAddress)).to.equal(
+        ethers.parseEther("150")
+      );
+    });
+
+    it("should trigger XCM call on routing (duplicate placeholder)", async function () {
       const { aegisVault, mockToken, mockXCM, aiOracle, user1 } = await deployFixture();
       const amount = ethers.parseEther("10");
       const destParachainId = 2004;
       const assetData = "0x1234abcd5678";
       const feeAssetItem = 0;
       const weightLimit = 1000000;
+      const assetType = 1; // Wrapper/Mapped
 
       // Deposit tokens first
       await aegisVault.connect(user1).deposit(await mockToken.getAddress(), amount);
@@ -501,7 +899,8 @@ describe("AegisVault", function () {
         42,
         assetData,
         feeAssetItem,
-        weightLimit
+        weightLimit,
+        assetType
       );
 
       // Verify that MockXCM received the call
@@ -513,13 +912,13 @@ describe("AegisVault", function () {
       expect(lastCall.parachainId).to.equal(destParachainId);
       expect(lastCall.assets).to.equal(assetData);
       expect(lastCall.feeAssetItem).to.equal(feeAssetItem);
-      expect(lastCall.weightLimit).to.equal(weightLimit);
+      expect(lastCall.weightLimit).to.equal(BigInt(weightLimit));
       expect(lastCall.caller).to.equal(await aegisVault.getAddress());
 
       // Verify calls by parachain
-      const callsToParachain = await mockXCM.getCallsByParachain(destParachainId);
-      expect(callsToParachain.length).to.equal(1);
       expect(await mockXCM.hasCallsToParachain(destParachainId)).to.equal(true);
+      const callsToPara = await mockXCM.getCallsByParachain(destParachainId);
+      expect(callsToPara.length).to.equal(1);
     });
 
     it("should track total routed amounts correctly", async function () {
@@ -527,6 +926,7 @@ describe("AegisVault", function () {
       const amount1 = ethers.parseEther("10");
       const amount2 = ethers.parseEther("20");
       const assetData = "0x1234";
+      const assetType = 1; // Wrapper/Mapped
 
       // Deposit tokens
       await aegisVault.connect(user1).deposit(await mockToken.getAddress(), ethers.parseEther("100"));
@@ -539,7 +939,8 @@ describe("AegisVault", function () {
         42,
         assetData,
         0,
-        1000000
+        1000000,
+        assetType
       );
 
       expect(await aegisVault.getTotalRouted(await mockToken.getAddress())).to.equal(amount1);
@@ -552,7 +953,8 @@ describe("AegisVault", function () {
         42,
         assetData,
         0,
-        1000000
+        1000000,
+        assetType
       );
 
       expect(await aegisVault.getTotalRouted(await mockToken.getAddress())).to.equal(
@@ -567,6 +969,7 @@ describe("AegisVault", function () {
       const assetData = "0xabcd1234";
       const feeAssetItem = 1;
       const weightLimit = 500000;
+      const assetType = 1; // Wrapper/Mapped
 
       // Deposit tokens first
       await aegisVault.connect(user1).deposit(await mockToken.getAddress(), amount);
@@ -580,7 +983,8 @@ describe("AegisVault", function () {
           42,
           assetData,
           feeAssetItem,
-          weightLimit
+          weightLimit,
+          assetType
         )
       )
         .to.emit(aegisVault, "XCMCalled")
@@ -605,7 +1009,8 @@ describe("AegisVault", function () {
           45,
           assetData,
           0,
-          1000000
+          1000000,
+          0 // assetType: Native
         );
       await aegisVault.connect(user1).withdraw(tokenAddress, ethers.parseEther("25"));
 

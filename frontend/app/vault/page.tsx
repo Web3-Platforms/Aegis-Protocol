@@ -5,6 +5,7 @@ import { DepositForm } from "@/components/DepositForm";
 import { WithdrawalForm } from "@/components/WithdrawalForm";
 import { VaultStats } from "@/components/VaultStats";
 import { TransactionHistory } from "@/components/TransactionHistory";
+import { XcmRoutePanel } from "@/components/XcmRoutePanel";
 
 const guides = [
   {
@@ -74,6 +75,8 @@ export default function VaultPage() {
           <DepositForm />
           <WithdrawalForm />
         </div>
+
+        <XcmRoutePanel />
 
         <TransactionHistory />
 
