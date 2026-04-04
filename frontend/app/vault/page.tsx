@@ -105,7 +105,7 @@ export default function VaultPage() {
             <div className="max-w-xl space-y-4">
               <h2 className="text-3xl font-bold tracking-tight">Need assistance?</h2>
               <p className="text-zinc-400 font-medium leading-relaxed">
-                If you're unsure about a specific yield strategy or want to verify a route before execution, our AI assistant is here to help.
+                If you&apos;re unsure about a specific yield strategy or want to verify a route before execution, our AI assistant is here to help.
               </p>
             </div>
             <div className="flex gap-4 shrink-0">
