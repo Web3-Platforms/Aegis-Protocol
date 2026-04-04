@@ -7,7 +7,9 @@
     "coverage": "hardhat coverage",
     "gas": "REPORT_GAS=true hardhat test test/AegisVault.gas.test.js",
     "compile": "hardhat compile",
-    "deploy": "hardhat run scripts/deploy.js --network paseo"
+    "deploy": "hardhat run scripts/deploy.js --network paseo",
+    "setup": "hardhat run scripts/setup-paseo.js --network paseo",
+    "mint": "hardhat run scripts/mint-tokens.js --network paseo"
   },
   "keywords": [],
   "author": "",
