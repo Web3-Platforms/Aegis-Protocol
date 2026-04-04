@@ -34,7 +34,7 @@ export default function ActivityPage() {
               Protocol <span className="text-primary">Activity</span>.
             </h1>
             <p className="text-lg text-muted-foreground font-medium max-w-2xl leading-relaxed">
-              Comprehensive overview of your vault's performance, transaction history, and active yield strategies across the Polkadot ecosystem.
+              Comprehensive overview of your vault&apos;s performance, transaction history, and active yield strategies across the Polkadot ecosystem.
             </p>
             <p className="text-sm text-muted-foreground font-medium max-w-2xl leading-relaxed">
               Data source: live contract events from the configured AegisVault on Paseo.
