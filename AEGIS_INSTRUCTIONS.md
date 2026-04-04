@@ -1,3 +1,10 @@
+> **Agent correction (post-hackathon):** Step 1 below says "revert if
+> `aiRiskScore > 75`". The deployed contract uses `>= MAX_RISK_SCORE` (75),
+> so a score of exactly 75 is **rejected**. The risk oracle returns
+> `safeToRoute: riskScore < 75`, which is consistent with the contract.
+> Use the contract and oracle as the source of truth, not this document.
+> The oracle currently uses keyword matching — no live LLM call is wired in.
+
 🤖 Aegis Protocol: AI Agent Execution Prompt
 
 🎯 Role & Objective

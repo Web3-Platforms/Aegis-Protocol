@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits } from "viem";
 import { AEGIS_VAULT_ABI, CONTRACT_ADDRESSES, SUPPORTED_TOKENS } from "@/lib/contracts";
@@ -11,7 +11,6 @@ export function WithdrawalForm() {
   const { address, isConnected } = useAccount();
   const [selectedToken, setSelectedToken] = useState<SupportedToken>(SUPPORTED_TOKENS[0]);
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [userBalance, setUserBalance] = useState("0");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -23,19 +22,15 @@ export function WithdrawalForm() {
     query: { enabled: !!address && !!selectedToken },
   });
 
+  // Derive display balance directly from contract data — no intermediate state needed.
+  const userBalance = depositBalance
+    ? (Number(depositBalance) / Math.pow(10, selectedToken.decimals)).toFixed(6)
+    : "0";
+
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
-
-  useEffect(() => {
-    if (depositBalance) {
-      const balance = Number(depositBalance) / Math.pow(10, selectedToken.decimals);
-      setUserBalance(balance.toFixed(6));
-    } else {
-      setUserBalance("0");
-    }
-  }, [depositBalance, selectedToken]);
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();

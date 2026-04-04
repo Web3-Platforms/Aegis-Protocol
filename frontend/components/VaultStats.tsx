@@ -3,28 +3,52 @@
 import { useAccount, useReadContract } from "wagmi";
 import { AEGIS_VAULT_ABI, CONTRACT_ADDRESSES, SUPPORTED_TOKENS } from "@/lib/contracts";
 
+// SUPPORTED_TOKENS is a fixed-length tuple (wPAS, USDC). Hooks are called at
+// the top level once per token slot so the call count never changes between renders.
 export function VaultStats() {
   const { address, isConnected } = useAccount();
 
-  const vaultStats = SUPPORTED_TOKENS.map((token) => {
-    const { data: totalDeposits } = useReadContract({
-      address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
-      abi: AEGIS_VAULT_ABI,
-      functionName: "totalDeposits",
-      args: [token.address as `0x${string}`],
-    });
+  const token0 = SUPPORTED_TOKENS[0];
+  const token1 = SUPPORTED_TOKENS[1];
 
-    const { data: userDeposit } = useReadContract({
-      address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
-      abi: AEGIS_VAULT_ABI,
-      functionName: "getUserDeposit",
-      args: address ? [address, token.address as `0x${string}`] : undefined,
-      query: { enabled: !!address },
-    });
+  const { data: totalDeposits0 } = useReadContract({
+    address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
+    abi: AEGIS_VAULT_ABI,
+    functionName: "totalDeposits",
+    args: [token0.address as `0x${string}`],
+  });
 
-    const normalizedTotal = totalDeposits ? Number(totalDeposits) / Math.pow(10, token.decimals) : 0;
-    const normalizedUser = userDeposit ? Number(userDeposit) / Math.pow(10, token.decimals) : 0;
+  const { data: userDeposit0 } = useReadContract({
+    address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
+    abi: AEGIS_VAULT_ABI,
+    functionName: "getUserDeposit",
+    args: address ? [address, token0.address as `0x${string}`] : undefined,
+    query: { enabled: !!address },
+  });
 
+  const { data: totalDeposits1 } = useReadContract({
+    address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
+    abi: AEGIS_VAULT_ABI,
+    functionName: "totalDeposits",
+    args: [token1.address as `0x${string}`],
+  });
+
+  const { data: userDeposit1 } = useReadContract({
+    address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
+    abi: AEGIS_VAULT_ABI,
+    functionName: "getUserDeposit",
+    args: address ? [address, token1.address as `0x${string}`] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const rawStats = [
+    { token: token0, totalDepositsRaw: totalDeposits0, userDepositRaw: userDeposit0 },
+    { token: token1, totalDepositsRaw: totalDeposits1, userDepositRaw: userDeposit1 },
+  ];
+
+  const vaultStats = rawStats.map(({ token, totalDepositsRaw, userDepositRaw }) => {
+    const normalizedTotal = totalDepositsRaw ? Number(totalDepositsRaw) / Math.pow(10, token.decimals) : 0;
+    const normalizedUser = userDepositRaw ? Number(userDepositRaw) / Math.pow(10, token.decimals) : 0;
     return {
       token,
       totalDeposits: normalizedTotal,
@@ -89,8 +113,8 @@ export function VaultStats() {
                 <p className="text-lg font-bold">{stat.totalDeposits.toFixed(2)}</p>
               </div>
               <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all duration-500" 
+                <div
+                  className="h-full bg-primary transition-all duration-500"
                   style={{ width: `${Math.min(stat.totalDeposits / 1000 * 100, 100)}%` }}
                 />
               </div>

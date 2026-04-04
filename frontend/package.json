@@ -5,6 +5,7 @@
   "scripts": {
     "test": "echo \"Use npm run test:e2e for browser tests\" && exit 0",
     "test:e2e": "playwright test",
+    "lint": "eslint app components lib",
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
@@ -27,6 +28,8 @@
     "@types/node": "25.5.0",
     "@types/react": "19.2.14",
     "autoprefixer": "^10.4.27",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.2",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.2",
     "typescript": "5.9.3"

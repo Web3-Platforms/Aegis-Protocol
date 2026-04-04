@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+// Risk oracle — current implementation: keyword-based scoring (no LLM call).
+// To add a real LLM: call the provider API here, parse the numeric score from
+// the response, and return it in the same shape: { parachainId, riskScore, safeToRoute }.
+// The risk gate threshold is riskScore < 75 (scores of 75 and above are blocked by the contract).
+//
 // MVP Option A hard-codes the destination to Paseo Asset Hub (destParachainId=1000).
 // We intentionally keep the risk scoring logic, but remove destination variability so MVP scope stays honest.
 const DEST_PARACHAIN_ID = Number(process.env.DEST_PARACHAIN_ID ?? 1000);

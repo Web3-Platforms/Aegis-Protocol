@@ -81,6 +81,7 @@ npm run compile                 # Compile only
 npm run setup                   # Full deploy: vault + mock tokens + config (recommended)
 npm run deploy                  # Vault only (use setup instead)
 npm run mint                    # Mint test tokens to RECIPIENT wallet
+npm run deploy                  # Deploy to Paseo (requires PRIVATE_KEY env var)
 ```
 
 ### Frontend
@@ -112,6 +113,8 @@ DEST_PARACHAIN_ID
 AI_ORACLE_PRIVATE_KEY          # server-side only — never NEXT_PUBLIC_
 OPENAI_API_KEY                 # optional — enables real LLM risk scoring
 GEMINI_API_KEY                 # optional — alternative LLM provider
+DESTINATION_VAULT_ADDRESS
+DEST_PARACHAIN_ID
 ```
 
 ---
@@ -124,6 +127,7 @@ GEMINI_API_KEY                 # optional — alternative LLM provider
 User intent (text)
   → POST /api/risk-oracle  { intent }
   ← { parachainId, riskScore, safeToRoute, scoringMethod }
+  ← { parachainId, riskScore, safeToRoute }
   → UI shows risk score
   → if safeToRoute: show "Confirm Transaction" button
   → wagmi write → AegisVault.routeYieldViaXCM(...)
@@ -148,6 +152,8 @@ owner wallet.
 The contract at `0x2BEf17e09b6F9a589d284f62F74281f0580969B3` is an **outdated
 version** (2982 bytes vs 8782 bytes in current source). Always run `npm run setup`
 to deploy the current version before testing real transactions.
+The oracle currently uses keyword matching (no external LLM call). Any LLM
+integration must keep the response shape identical.
 
 ### Contract Access Control
 
