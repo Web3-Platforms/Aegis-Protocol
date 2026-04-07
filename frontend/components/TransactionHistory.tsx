@@ -1,25 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ActivityTransaction } from "@/lib/useVaultActivityData";
+import type { ActivityTransaction } from "@/lib/activity";
+import { getAegisExplorerTxUrl } from "@/lib/runtime/environment";
 
 const PAGE_SIZE = 10;
-type FilterType = "all" | "deposit" | "withdrawal" | "yield_routed";
+type FilterType = "all" | "deposit" | "withdrawal" | "route_event";
 
 interface TransactionHistoryProps {
   transactions?: ActivityTransaction[];
   isLoading?: boolean;
-  routedAssetAddress?: string;
-  destinationParachainId?: number;
-  destinationVaultAddress?: string;
+  errorMessage?: string | null;
 }
 
 export function TransactionHistory({
   transactions = [],
   isLoading = false,
-  routedAssetAddress = "",
-  destinationParachainId = 1000,
-  destinationVaultAddress = "",
+  errorMessage = null,
 }: TransactionHistoryProps) {
   // Combine filter + page into one state so changing the filter atomically
   // resets the page — no setState-in-effect needed.
@@ -40,7 +37,11 @@ export function TransactionHistory({
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));
-  const pageSlice = filteredTransactions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const currentPage = Math.min(page, totalPages - 1);
+  const pageSlice = filteredTransactions.slice(
+    currentPage * PAGE_SIZE,
+    (currentPage + 1) * PAGE_SIZE
+  );
 
   // ── CSV export ────────────────────────────────────────────────────────
   function exportCSV() {
@@ -69,7 +70,7 @@ export function TransactionHistory({
   const typeLabel = (type: string) => {
     if (type === "deposit") return "Deposit";
     if (type === "withdrawal") return "Withdrawal";
-    if (type === "yield_routed") return "Yield Routed";
+    if (type === "route_event") return "Route Event";
     return "Transaction";
   };
 
@@ -86,13 +87,22 @@ export function TransactionHistory({
   const truncate = (hash: string) =>
     hash.length > 12 ? `${hash.slice(0, 6)}…${hash.slice(-4)}` : hash;
 
-  const subscanUrl = (hash: string) =>
-    `https://paseo.subscan.io/tx/${hash}`;
+  const subscanUrl = (hash: string) => getAegisExplorerTxUrl(hash);
 
   if (isLoading) {
     return (
       <div className="aegis-panel p-12 flex items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="aegis-panel py-16 text-center">
+        <p className="text-muted-foreground font-medium">
+          Recent ledger is unavailable until the activity API recovers.
+        </p>
       </div>
     );
   }
@@ -106,25 +116,14 @@ export function TransactionHistory({
           <p className="text-sm text-muted-foreground">
             On-chain <code className="text-xs bg-secondary px-1 rounded">Deposit</code>,{" "}
             <code className="text-xs bg-secondary px-1 rounded">Withdrawal</code>, and{" "}
-            <code className="text-xs bg-secondary px-1 rounded">YieldRoutedViaXCM</code> events
+            <code className="text-xs bg-secondary px-1 rounded">XcmRouted</code> beta logs
           </p>
-          {destinationVaultAddress && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Route target: parachain {destinationParachainId} · vault{" "}
-              {destinationVaultAddress.slice(0, 8)}…
-            </p>
-          )}
-          {routedAssetAddress && (
-            <p className="text-xs text-muted-foreground">
-              Routed asset: {routedAssetAddress}
-            </p>
-          )}
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
           {/* Filter tabs */}
           <div className="flex p-1 bg-secondary/50 rounded-xl border w-fit">
-            {(["all", "deposit", "withdrawal", "yield_routed"] as const).map((id) => (
+            {(["all", "deposit", "withdrawal", "route_event"] as const).map((id) => (
               <button
                 key={id}
                 onClick={() => setFilter(id)}
@@ -133,8 +132,8 @@ export function TransactionHistory({
                     ? "bg-white shadow-sm text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
-              >
-                {id === "all" ? "All" : id === "yield_routed" ? "Yields" : id.charAt(0).toUpperCase() + id.slice(1) + "s"}
+                >
+                {id === "all" ? "All" : id === "route_event" ? "Route Events" : id.charAt(0).toUpperCase() + id.slice(1) + "s"}
               </button>
             ))}
           </div>
@@ -155,7 +154,7 @@ export function TransactionHistory({
         <div className="aegis-panel py-16 text-center">
           <p className="text-muted-foreground font-medium">
             {transactions.length === 0
-              ? "No on-chain transactions found. Deposit to get started."
+              ? "No on-chain activity found in the current indexed window."
               : "No transactions match this filter."}
           </p>
         </div>
@@ -198,7 +197,7 @@ export function TransactionHistory({
                     </td>
                     <td className="px-6 py-4">
                       <span className={`text-sm font-bold ${tx.type === "withdrawal" ? "text-foreground" : "text-primary"}`}>
-                        {tx.type === "withdrawal" ? "−" : "+"}
+                          {tx.type === "withdrawal" ? "−" : tx.type === "route_event" ? "→" : "+"}
                         {tx.amount.toFixed(2)} {tx.token}
                       </span>
                     </td>
@@ -223,30 +222,30 @@ export function TransactionHistory({
 
       {/* Pagination */}
       <div className="flex items-center justify-between px-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          Showing{" "}
-          <span className="text-foreground font-bold">
-            {filteredTransactions.length === 0 ? 0 : page * PAGE_SIZE + 1}–
-            {Math.min((page + 1) * PAGE_SIZE, filteredTransactions.length)}
-          </span>{" "}
-          of{" "}
-          <span className="text-foreground font-bold">{filteredTransactions.length}</span>{" "}
-          transactions
-        </p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Showing{" "}
+            <span className="text-foreground font-bold">
+             {filteredTransactions.length === 0 ? 0 : currentPage * PAGE_SIZE + 1}–
+             {Math.min((currentPage + 1) * PAGE_SIZE, filteredTransactions.length)}
+           </span>{" "}
+           of{" "}
+           <span className="text-foreground font-bold">{filteredTransactions.length}</span>{" "}
+           transactions
+         </p>
         <div className="flex gap-2">
           <button
-            onClick={() => setPage(Math.max(0, page - 1))}
-            disabled={page === 0}
+            onClick={() => setPage(Math.max(0, currentPage - 1))}
+            disabled={currentPage === 0}
             className="h-8 px-3 rounded-lg border bg-background text-xs font-bold hover:bg-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ← Previous
           </button>
           <span className="h-8 px-3 flex items-center text-xs font-bold text-muted-foreground">
-            {page + 1} / {totalPages}
+            {currentPage + 1} / {totalPages}
           </span>
           <button
-            onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-            disabled={page >= totalPages - 1}
+            onClick={() => setPage(Math.min(totalPages - 1, currentPage + 1))}
+            disabled={currentPage >= totalPages - 1}
             className="h-8 px-3 rounded-lg border bg-background text-xs font-bold hover:bg-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Next →

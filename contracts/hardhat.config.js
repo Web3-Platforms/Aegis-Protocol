@@ -6,6 +6,14 @@ require("dotenv").config({ path: __dirname + "/.env.local" });
 
 /** @type import('hardhat/config').HardhatUserConfig */
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
+const PASEO_RPC_URL =
+  process.env.PASEO_RPC_URL ||
+  process.env.NEXT_PUBLIC_PASEO_RPC_URL ||
+  "https://eth-rpc-testnet.polkadot.io";
+const MOONBASE_RPC_URL =
+  process.env.MOONBASE_RPC_URL ||
+  process.env.NEXT_PUBLIC_MOONBASE_RPC_URL ||
+  "https://rpc.api.moonbase.moonbeam.network";
 
 const config = {
   solidity: {
@@ -35,8 +43,14 @@ const config = {
     },
     // Paseo testnet (Polkadot Hub EVM endpoint)
     paseo: {
-      url: process.env.NEXT_PUBLIC_PASEO_RPC_URL || "https://eth-rpc-testnet.polkadot.io",
+      url: PASEO_RPC_URL,
       chainId: 420420417,
+      accounts: [PRIVATE_KEY]
+    },
+    // Moonbase Alpha protected staging
+    moonbaseAlpha: {
+      url: MOONBASE_RPC_URL,
+      chainId: 1287,
       accounts: [PRIVATE_KEY]
     }
   },

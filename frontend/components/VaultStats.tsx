@@ -1,69 +1,29 @@
 "use client";
 
-import { useAccount, useReadContract } from "wagmi";
-import { AEGIS_VAULT_ABI, CONTRACT_ADDRESSES, SUPPORTED_TOKENS } from "@/lib/contracts";
+import { useAccount } from "wagmi";
+import { useVaultPortfolioData } from "@/lib/useVaultPortfolioData";
 
-// SUPPORTED_TOKENS is a fixed-length tuple (wPAS, USDC). Hooks are called at
-// the top level once per token slot so the call count never changes between renders.
 export function VaultStats() {
-  const { address, isConnected } = useAccount();
-
-  const token0 = SUPPORTED_TOKENS[0];
-  const token1 = SUPPORTED_TOKENS[1];
-
-  const { data: totalDeposits0 } = useReadContract({
-    address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
-    abi: AEGIS_VAULT_ABI,
-    functionName: "totalDeposits",
-    args: [token0.address as `0x${string}`],
-  });
-
-  const { data: userDeposit0 } = useReadContract({
-    address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
-    abi: AEGIS_VAULT_ABI,
-    functionName: "getUserDeposit",
-    args: address ? [address, token0.address as `0x${string}`] : undefined,
-    query: { enabled: !!address },
-  });
-
-  const { data: totalDeposits1 } = useReadContract({
-    address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
-    abi: AEGIS_VAULT_ABI,
-    functionName: "totalDeposits",
-    args: [token1.address as `0x${string}`],
-  });
-
-  const { data: userDeposit1 } = useReadContract({
-    address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
-    abi: AEGIS_VAULT_ABI,
-    functionName: "getUserDeposit",
-    args: address ? [address, token1.address as `0x${string}`] : undefined,
-    query: { enabled: !!address },
-  });
-
-  const rawStats = [
-    { token: token0, totalDepositsRaw: totalDeposits0, userDepositRaw: userDeposit0 },
-    { token: token1, totalDepositsRaw: totalDeposits1, userDepositRaw: userDeposit1 },
-  ];
-
-  const vaultStats = rawStats.map(({ token, totalDepositsRaw, userDepositRaw }) => {
-    const normalizedTotal = totalDepositsRaw ? Number(totalDepositsRaw) / Math.pow(10, token.decimals) : 0;
-    const normalizedUser = userDepositRaw ? Number(userDepositRaw) / Math.pow(10, token.decimals) : 0;
-    return {
-      token,
-      totalDeposits: normalizedTotal,
-      userDeposit: normalizedUser,
-      userShare: normalizedTotal > 0 ? (normalizedUser / normalizedTotal) * 100 : 0,
-    };
-  });
+  const { isConnected } = useAccount();
+  const { assets, errorMessage, isLoading } = useVaultPortfolioData();
 
   return (
-    <section className="grid gap-6 xl:grid-cols-2">
-      <article className="aegis-panel p-6 overflow-hidden relative">
+    <div className="space-y-4">
+      {errorMessage && (
+        <div className="rounded-2xl border border-red-200 bg-red-50/80 p-4 text-red-900 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-100">
+          <p className="text-sm font-semibold">Portfolio snapshot unavailable</p>
+          <p className="mt-1 text-xs leading-relaxed opacity-90">{errorMessage}</p>
+        </div>
+      )}
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <article className="aegis-panel p-6 overflow-hidden relative">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Your Deposits</h2>
-            <p className="text-sm text-muted-foreground">Managing your assets in the vault</p>
+            <h2 className="text-xl font-bold tracking-tight">Your Current Positions</h2>
+            <p className="text-sm text-muted-foreground">
+              Server-owned snapshot of supported vault assets for the connected wallet
+            </p>
           </div>
           <span className={`aegis-badge ${isConnected ? "aegis-badge-success" : "aegis-badge-brand"}`}>
             {isConnected ? "Connected" : "Not Connected"}
@@ -71,57 +31,81 @@ export function VaultStats() {
         </div>
 
         <div className="space-y-4">
-          {vaultStats.map((stat) => (
-            <div key={stat.token.address} className="flex items-center justify-between p-4 rounded-xl border bg-secondary/30 transition-colors hover:bg-secondary/50">
+          {assets.map((asset) => (
+            <div key={asset.tokenAddress} className="flex items-center justify-between p-4 rounded-xl border bg-secondary/30 transition-colors hover:bg-secondary/50">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{stat.token.icon}</span>
                 <div>
-                  <p className="font-semibold">{stat.token.symbol}</p>
-                  <p className="text-xs text-muted-foreground">Share: {stat.userShare.toFixed(2)}%</p>
+                  <p className="font-semibold">{asset.symbol}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Share: {(asset.userPosition.shareBps / 100).toFixed(2)}%
+                  </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-lg font-bold">{stat.userDeposit.toFixed(4)}</p>
+                <p className="text-lg font-bold">{asset.userPosition.display}</p>
               </div>
             </div>
           ))}
+          {isLoading && (
+            <div className="aegis-panel p-8 flex items-center justify-center">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          )}
           {!isConnected && (
             <div className="text-center py-8">
-              <p className="text-sm text-muted-foreground">Connect your wallet to see your deposits</p>
+              <p className="text-sm text-muted-foreground">
+                Connect your wallet to see your current positions
+              </p>
+            </div>
+          )}
+          {!isLoading && !errorMessage && assets.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">
+                No supported assets are configured for this runtime yet.
+              </p>
             </div>
           )}
         </div>
       </article>
 
-      <article className="aegis-panel p-6">
+        <article className="aegis-panel p-6">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Total Vault TVL</h2>
-            <p className="text-sm text-muted-foreground">Protocol-wide liquidity metrics</p>
+            <h2 className="text-xl font-bold tracking-tight">Total Beta Vault Deposits</h2>
+            <p className="text-sm text-muted-foreground">
+              Server-owned snapshot of on-chain deposit balances by supported beta asset
+            </p>
           </div>
-          <span className="aegis-badge aegis-badge-brand">Real-time</span>
+          <span className="aegis-badge aegis-badge-brand">Server snapshot</span>
         </div>
 
         <div className="space-y-4">
-          {vaultStats.map((stat) => (
-            <div key={stat.token.address} className="p-4 rounded-xl border bg-secondary/30 transition-colors hover:bg-secondary/50">
+          {assets.map((asset) => (
+            <div key={asset.tokenAddress} className="p-4 rounded-xl border bg-secondary/30 transition-colors hover:bg-secondary/50">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{stat.token.icon}</span>
-                  <p className="font-semibold">{stat.token.symbol}</p>
-                </div>
-                <p className="text-lg font-bold">{stat.totalDeposits.toFixed(2)}</p>
+                <p className="font-semibold">{asset.symbol}</p>
+                <p className="text-lg font-bold">{asset.vaultPosition.display}</p>
               </div>
-              <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-500"
-                  style={{ width: `${Math.min(stat.totalDeposits / 1000 * 100, 100)}%` }}
-                />
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Current on-chain total in the beta vault.
+              </p>
             </div>
           ))}
+          {isLoading && (
+            <div className="aegis-panel p-8 flex items-center justify-center">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          )}
+          {!isLoading && !errorMessage && assets.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">
+                Vault totals will appear after this runtime has supported assets configured.
+              </p>
+            </div>
+          )}
         </div>
-      </article>
-    </section>
+        </article>
+      </section>
+    </div>
   );
 }

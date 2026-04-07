@@ -25,75 +25,55 @@ Read it top to bottom the first time, then use the section links as a reference.
 
 ## 1. What Aegis Protocol Is
 
-Aegis Protocol is a **yield vault** on the Polkadot Hub (Paseo testnet). Users
-deposit ERC-20 tokens into the vault. An AI oracle scores the risk of routing
-those tokens to yield strategies on other parachains. If the risk score is below
-75, the vault executes the cross-chain transfer via XCM.
+Aegis Protocol is currently a **pilot-first, vault-only beta** on the Polkadot
+Hub (Paseo testnet). Users can deposit and withdraw supported ERC-20 assets in
+the vault. A risk-oracle workflow and route-submission path exist for
+experimental evaluation, but they are **not** part of the default public beta
+launch surface.
 
 **Core value propositions:**
 
 | Value | What it means |
 |-------|---------------|
-| **AI-gated routing** | No capital moves cross-chain unless an AI oracle approves it (score < 75). This is enforced on-chain — the contract reverts if the score is too high. |
+| **Vault-only beta** | The default launch surface is wallet connect plus supported deposit/withdraw flows on Paseo. |
+| **Risk assessment beta** | The assistant can score routing ideas and return a prototype risk result without claiming live production execution. |
 | **Non-custodial** | Users hold their own keys. The vault holds tokens only while they are deposited. Withdrawals are instant. |
-| **XCM-native** | Built on Polkadot's native cross-chain messaging protocol, not a bridge. When the XCM precompile is live on Paseo, routes execute natively. |
-| **Intent-based UX** | Users describe what they want in plain English ("earn yield on Acala"). The AI translates that into a risk score and a routing decision. |
+| **XCM evaluation path** | The contract and UI keep an experimental XCM-related workflow for pilot environments, but launch-safe tooling keeps routing paused until a real target-chain path is proven. |
+| **Intent-based UX** | Users can describe what they want in plain English and receive a prototype risk assessment for planning or pilot review. |
 
 ---
 
 ## 2. How the System Works End-to-End
 
 ```
-User types intent in chat
+User connects wallet
         │
-        ▼
-POST /api/risk-oracle  { intent: "earn yield safely" }
+        ├── Vault flow (default beta)
+        │      ▼
+        │   ERC-20 approve(vault, amount)
+        │      ▼
+        │   AegisVault.deposit(token, amount)
+        │      • Vault pulls tokens from user wallet
+        │      • Emits Deposit event
+        │      ▼
+        │   User can later call AegisVault.withdraw(token, amount)
+        │      • Emits Withdrawal event
         │
-        ▼
-Risk Oracle scores intent (0–100)
-  • OpenAI / Gemini if API key is set
-  • Keyword fallback otherwise
-        │
-        ▼
-Returns { parachainId: 1000, riskScore: 42, safeToRoute: true }
-        │
-        ▼  (only if safeToRoute)
-User clicks "Confirm Transaction"
-        │
-        ▼
-wagmi → ERC-20 approve(vault, amount)
-        │
-        ▼
-wagmi → AegisVault.deposit(token, amount)
-  • Vault pulls tokens from user wallet
-  • Emits Deposit event
-        │
-        ▼
-DepositForm calls POST /api/execute-route  { userAddress, intent }
-        │
-        ▼
-execute-route API (server-side, signed by AI oracle wallet):
-  1. Reads user's deposited balance from vault
-  2. Encodes XCM asset data
-  3. Calls AegisVault.routeYieldViaXCM(...)
-        │
-        ▼
-AegisVault.routeYieldViaXCM checks:
-  • caller == aiOracleAddress
-  • aiRiskScore < 75
-  • token is supported
-  • amount <= vault balance
-  • XCM routing not paused
-  • route cap not exceeded
-        │
-        ▼
-Calls IPolkadotXCM(xcmPrecompileAddress).sendXcm(...)
-  • On Paseo today: xcmPrecompileAddress = address(0) → no-op, tx succeeds
-  • When precompile ships: real XCM message dispatched to parachain 1000
-        │
-        ▼
-Emits YieldRoutedViaXCM + XcmRouted events
-Activity page reads these events and displays them
+        └── Assistant flow (assessment by default)
+               ▼
+            POST /api/risk-oracle  { intent: "earn yield safely" }
+               ▼
+            Risk Oracle scores intent (0–100)
+              • OpenAI / Gemini if API key is set
+              • Keyword fallback otherwise
+               ▼
+            Returns { parachainId: 1000, riskScore: 42, safeToRoute: true }
+               ▼
+            If experimental routing is explicitly enabled:
+              • user can review a testnet route submission
+              • /api/execute-route signs and submits routeYieldViaXCM(...)
+              • route-related events may be emitted for evaluation, but this is
+                still not proof of a live cross-chain message
 ```
 
 ---
@@ -120,18 +100,22 @@ The contract currently on-chain (`0x2BEf...`) is an **outdated version** (2982 b
 vs 8782 bytes in the current source). You must redeploy.
 
 ```bash
-# In the contracts/ directory:
-echo "PRIVATE_KEY=0x<your-private-key>" > contracts/.env.local
-
 cd contracts
+cp .env.example .env.paseo-local
+cp .env.paseo-local .env.local
+# Edit .env.paseo-local (or the active .env.local copy) and set PRIVATE_KEY
+# before running setup. Keep separate env files for protected Moonbase/Moonbeam work.
 npm run setup
 # This runs scripts/setup-paseo.js which:
-#   - Deploys AegisVault (current version)
-#   - Deploys wPAS and test-USDC mock tokens
-#   - Registers both tokens as supported
-#   - Sets xcmPrecompileAddress to address(0) (graceful no-op)
+#   - Deploys the current demo vault flow for Paseo only
+#   - Deploys mock tokens and registers them
 #   - Prints the .env.local block to copy
 ```
+
+For protected Moonbase / Moonbeam launch work, do **not** treat `npm run setup`
+as a canonical bootstrap path. Use the checked-in launch profiles under
+`config/launch/` plus `launch:deploy` / `launch:prepare` / `launch:verify` described
+in the deployment reference below.
 
 The script prints something like:
 
@@ -144,8 +128,20 @@ NEXT_PUBLIC_WPAS_ADDRESS=0x<new-wpas>
 NEXT_PUBLIC_TEST_USDC_ADDRESS=0x<new-usdc>
 NEXT_PUBLIC_USDC_TOKEN_ADDRESS=0x<new-usdc>
 DEST_PARACHAIN_ID=1000
+NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING=false
+AI_ORACLE_RELAY_ENABLED=false
 NEXT_PUBLIC_E2E_MOCK_WALLET=false
 AI_ORACLE_PRIVATE_KEY=0x<your-private-key-here>
+# Optional rotation metadata for operator checks:
+# AI_ORACLE_KEY_VERSION=oracle-paseo-local-001
+# AI_ORACLE_KEY_ROTATED_AT=2026-04-06T00:00:00Z
+# AI_ORACLE_RELAY_DATABASE_URL=postgresql://...
+# AI_ORACLE_RELAY_ALERT_WEBHOOK_URL=https://...
+# AI_ORACLE_ALERT_WEBHOOK_AUTH_TOKEN=<optional-bearer-token>
+# AI_ORACLE_ALERT_SOURCE=aegis-paseo-relay
+# AI_ORACLE_ALERT_TIMEOUT_MS=3000
+# AI_ORACLE_RELAY_ALERT_ENVIRONMENT=railway-staging
+# AEGIS_LAUNCH_KPI_DASHBOARD_AUTH_TOKEN=<strong-random-token>
 ```
 
 ### Step 3 — Configure the frontend
@@ -153,12 +149,77 @@ AI_ORACLE_PRIVATE_KEY=0x<your-private-key-here>
 ```bash
 cp frontend/.env.example frontend/.env.local
 # Paste the block printed by setup-paseo.js
-# Set AI_ORACLE_PRIVATE_KEY to the same private key used for deployment
+# For local demo-only work, AI_ORACLE_PRIVATE_KEY may match the deployment key.
+# For Railway or protected environments, use a dedicated oracle-only key.
 ```
 
 `AI_ORACLE_PRIVATE_KEY` is a **server-side secret** — it is never sent to the
 browser. It is the private key of the wallet that was set as `aiOracleAddress`
-during deployment (same as the deployer by default).
+during deployment. `setup-paseo.js` still defaults to deployer-equals-oracle for
+local/demo work, but Railway or other protected environments should rotate to a
+dedicated oracle-only signer, set `AI_ORACLE_KEY_VERSION` plus
+`AI_ORACLE_KEY_ROTATED_AT`, and validate with `npm run relay:check-secrets`.
+`AI_ORACLE_RELAY_ENABLED` stays `false` for the default public beta posture;
+only enable it for explicit operator-controlled Paseo relay workflows.
+`AEGIS_LAUNCH_KPI_DASHBOARD_AUTH_TOKEN` is a separate internal-only bearer token
+for `GET /api/launch-kpi`; it should never be exposed in the browser or public
+docs.
+If you enable product instrumentation, treat those funnel counts as same-origin
+client-reported directional signals, not CRM or anti-fraud evidence.
+
+For protected Moonbase staging, switch the frontend/runtime to:
+
+```bash
+NEXT_PUBLIC_AEGIS_ENV=moonbase-staging
+NEXT_PUBLIC_MOONBASE_RPC_URL=https://rpc.api.moonbase.moonbeam.network
+NEXT_PUBLIC_MOONBASE_STAGING_VAULT_ADDRESS=0x<moonbase-vault>
+NEXT_PUBLIC_MOONBASE_STAGING_TOKEN_ADDRESS=0x<staging-stable>
+NEXT_PUBLIC_MOONBASE_STAGING_TOKEN_SYMBOL=mUSDC
+NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING=false
+AI_ORACLE_RELAY_ENABLED=false
+```
+
+Use `docs/project-management/AEGIS_701_STAGING_ENVIRONMENT.md` as the manual
+operator runbook for that protected staging mode.
+
+### Step 3b — Configure protected launch envs
+
+```bash
+cp contracts/.env.example contracts/.env.moonbase-staging.local
+cp contracts/.env.moonbase-staging.local contracts/.env.local
+# Fill in RPC_URL, PRIVATE_KEY, owner/deployer addresses, and any profile token envs
+# in the per-environment file, then copy the active one into contracts/.env.local
+# before each launch command.
+```
+
+For a protected launch deployment, run:
+
+```bash
+cd contracts
+npm run compile
+npm run launch:deploy -- --profile moonbase-staging
+```
+
+This deploys `AegisVaultLaunch`, verifies the paused defaults on-chain, and
+writes deployment metadata to `contracts/deployments/<profile>.json`. After that,
+set `AEGIS_VAULT_ADDRESS` in `contracts/.env.local` to the deployed address and
+continue with:
+
+```bash
+npm run launch:check-key-posture -- --profile moonbase-staging
+npm run launch:prepare -- --profile moonbase-staging --mode plan
+# Execute the emitted owner/multisig actions here.
+npm run launch:verify -- --profile moonbase-staging --frontend-env ../frontend/.env.local
+npm run launch:prove -- --profile moonbase-staging
+```
+
+Keep the same profile through deploy, prepare, verify, and prove. Keep separate
+env files per protected environment and copy the active one to
+`contracts/.env.local` before running launch commands. Only move to
+`moonbeam-pilot` after the Moonbase staging packet and proof outputs are retained.
+When `--frontend-env ../frontend/.env.local` is supplied, `launch:verify` treats
+that file as the source of truth for `NEXT_PUBLIC_*` checks and fails if the
+experimental-routing flag is missing there.
 
 ### Step 4 — Mint test tokens to your wallet
 
@@ -185,31 +246,55 @@ npm run dev
    - Second: `deposit` (vault pulls the tokens)
 4. After both confirm, your balance appears in the vault stats.
 
-### Step 7 — Route yield via the AI oracle
+### Step 7 — Optional: enable experimental route submission
 
-After depositing, the UI automatically calls `/api/execute-route`. You can also
-trigger it manually from the **XCM Route Panel** on the vault page.
+The default beta keeps route submission **off**. If you are running an
+operator-assisted pilot or local evaluation environment, explicitly opt in:
 
-The transaction will:
+```bash
+# frontend/.env.local
+NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING=true
+```
+
+After restarting the frontend, the **XCM Route Panel** and assistant can expose
+the experimental submission path again.
+
+The submission flow will:
 - Call `routeYieldViaXCM` on-chain as the AI oracle
-- Succeed (the vault logic runs, events are emitted)
-- The XCM call itself is a no-op (address(0)) until Polkadot Hub ships the precompile
+- Succeed only if the vault/oracle config is correct
+- Emit route-related events on Paseo
+- Still remain a beta evaluation path rather than a launch-safe XCM proof
 
-You will see the route appear in the **Activity** page.
+The route CTA is still intentionally strict. Even in an enabled pilot
+environment, submission only unlocks when:
+
+- the connected wallet is on the active Aegis runtime
+- the wallet has a non-zero deposited route-asset balance in the beta vault
+- no tracked request is still pending for that wallet/runtime
+- the latest failed request has been reviewed and dismissed
+- the scoped portfolio snapshot is healthy
 
 ### Step 8 — Use the chat interface
 
 Go to **Chat** → type something like "Earn yield safely on Acala" → the AI oracle
-scores it → if safe, click **Confirm Transaction**.
+scores it. In the default beta, this stops at assessment. In an explicitly
+enabled pilot environment, a confirmable experimental submission step appears
+only when the current wallet also satisfies the route-eligibility checks above.
 
 ---
 
 ## 4. The Smart Contract
 
-**File:** `contracts/contracts/AegisVault.sol`
-**Deployed at:** set by `npm run setup` → written to `contracts/deployments/paseo.json`
+**Prototype file:** `contracts/contracts/AegisVault.sol`
+**Launch file:** `contracts/contracts/AegisVaultLaunch.sol`
+**Prototype deployment:** set by `npm run setup` → written to `contracts/deployments/paseo.json`
 
-### Key functions
+`AegisVault.sol` remains the current Paseo beta prototype with route and
+rebalancing surfaces. `AegisVaultLaunch.sol` is the reduced-surface Moonbeam
+launch target with single-token vault-only scope and explicit deposit/withdraw
+pause controls.
+
+### Prototype key functions
 
 | Function | Who can call | What it does |
 |----------|-------------|--------------|
@@ -221,7 +306,20 @@ scores it → if safe, click **Confirm Transaction**.
 | `setAIOracleAddress(addr)` | Owner only | Change the oracle wallet |
 | `setXCMPrecompileAddress(addr)` | Owner only | Point to the real XCM precompile when live |
 | `toggleXcmRoute()` | Owner only | Pause/unpause XCM routing (circuit breaker) |
+| `toggleRebalancing()` | Owner only | Pause/unpause rebalancing |
 | `setRouteCap(token, cap)` | Owner only | Limit how much of a token can be routed |
+| `setRouteCapByAssetType(token, assetType, cap)` | Owner only | Limit routed amount per asset type |
+| `transferOwnership(addr)` | Owner only | Hand ownership to the intended multisig/admin |
+
+### Launch-contract key functions
+
+| Function | Who can call | What it does |
+|----------|-------------|--------------|
+| `deposit(token, amount)` | Anyone | Pulls the fixed launch token from the user |
+| `withdraw(token, amount)` | Anyone | Returns the fixed launch token to the depositor |
+| `setDepositsPaused(bool)` | Owner only | Independently pause/unpause deposits |
+| `setWithdrawalsPaused(bool)` | Owner only | Independently pause/unpause withdrawals |
+| `transferOwnership(addr)` | Owner only | Hand ownership to the intended multisig/admin |
 
 ### Safety mechanisms
 
@@ -311,21 +409,49 @@ This is the server-side oracle relay. It:
 2. Encodes XCM asset data
 3. Signs and submits `routeYieldViaXCM` as the AI oracle wallet
 
-**Required env var:** `AI_ORACLE_PRIVATE_KEY=0x<64-hex-chars>`
+**Required for server-side route submission**
+
+- `AI_ORACLE_RELAY_ENABLED=true`
+- `AI_ORACLE_PRIVATE_KEY=0x<64-hex-chars>`
+- `AI_ORACLE_RELAY_DATABASE_URL=postgresql://...` or `DATABASE_URL=postgresql://...` for hosted/operator deployments
+- `NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING=true` only if you want the UI to expose the experimental route flow
+- Optional: `AI_ORACLE_RELAY_ALERT_WEBHOOK_URL=https://...` for best-effort operator alerts on material relay failures
+
+`NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING` affects the UI only. `POST /api/execute-route`
+remains disabled unless `AI_ORACLE_RELAY_ENABLED=true`.
 
 This key must match the `aiOracleAddress` stored in the vault. After running
 `npm run setup`, the deployer address is the oracle — use the same private key.
+
+Before signing, the relay:
+
+1. verifies it is running against **Paseo**
+2. verifies the configured signer matches the vault's `aiOracleAddress`
+3. refuses hosted operation without Postgres-backed storage
+4. returns structured failure metadata (`failureCategory`, `retryDisposition`, `operatorAction`, `operatorAlertStatus`) for operator handling
+
+The experimental UI now also keeps a wallet-scoped recent-request view:
+
+- chat and vault routing surfaces render a shared `Recent Route Requests` panel
+- the panel shows `requested -> validated -> submitted -> source_confirmed / failed`
+- source-chain proof links only appear when `txHash` exists
+- browser persistence is scoped by runtime + wallet
+- status polling now calls `GET /api/execute-route?requestId=<id>&userAddress=<wallet>`
 
 **Error responses and what they mean:**
 
 | HTTP | Error | Fix |
 |------|-------|-----|
-| 400 | Missing userAddress | Pass `userAddress` in the request body |
+| 400 | Missing userAddress | Pass `userAddress` in the query string alongside `requestId` |
 | 400 | No deposited balance | User must deposit first |
 | 400 | Token not supported | Run `addSupportedToken` from owner wallet |
 | 403 | Route blocked by risk gate | Score >= 75; use a safer intent |
 | 403 | Oracle address mismatch | `AI_ORACLE_PRIVATE_KEY` doesn't match vault's `aiOracleAddress` |
-| 501 | AI_ORACLE_PRIVATE_KEY not set | Add it to `frontend/.env.local` |
+| 503 | Experimental route relay disabled | Set `AI_ORACLE_RELAY_ENABLED=true` for an explicit operator-controlled Paseo deployment |
+| 503 | Durable relay storage is not configured | Set `AI_ORACLE_RELAY_DATABASE_URL` or `DATABASE_URL`, or use `AI_ORACLE_RELAY_ALLOW_FILE_STORE=true` only for single-instance local work |
+| 503 | Route relay is pinned to Paseo only | Point the relay back to Paseo or leave it disabled |
+| 503 | Route cap exceeded | Raise the relevant route cap before retrying |
+| 501 | AI_ORACLE_PRIVATE_KEY not set | Add it to `frontend/.env.local` or the hosted server env |
 | 503 | XCM routing paused | Call `vault.toggleXcmRoute()` from owner wallet |
 
 ---
@@ -339,22 +465,23 @@ This key must match the `aiOracleAddress` stored in the vault. After running
 | Route | File | Purpose |
 |-------|------|---------|
 | `/` | `app/page.tsx` | Landing page with hero, features, CTA |
-| `/vault` | `app/vault/page.tsx` | Deposit, withdraw, XCM route panel |
+| `/vault` | `app/vault/page.tsx` | Deposit, withdraw, inspect current supported-asset positions, recent wallet history, and a gated experimental route panel |
 | `/chat` | `app/chat/page.tsx` | Intent chat interface |
-| `/activity` | `app/activity/page.tsx` | Transaction history, yield stats |
+| `/activity` | `app/activity/page.tsx` | Transaction history and route-event summaries |
 
 ### Key components
 
 | Component | What it does |
 |-----------|-------------|
-| `Web3Provider` | Configures wagmi for Paseo Testnet (chainId 420420417) |
+| `Web3Provider` | Configures wagmi from the shared runtime registry for `paseo-beta` or `moonbase-staging` |
 | `Navbar` | Wallet connect button, navigation |
 | `DepositForm` | ERC-20 approve → vault deposit flow |
 | `WithdrawalForm` | Vault withdraw flow |
-| `VaultStats` | Reads `totalDeposits` and `getUserDeposit` live from chain |
-| `ChatInterface` | Intent input → risk oracle → confirm/cancel flow |
-| `XcmRoutePanel` | Manual XCM route trigger with configurable params |
-| `TransactionHistory` | Paginated table of on-chain events, CSV export |
+| `VaultStats` | Reads the server-owned `/api/portfolio` snapshot for supported-asset positions |
+| `ChatInterface` | Intent input → risk oracle → optional confirm/cancel flow when experimental routing is enabled |
+| `XcmRoutePanel` | Manual experimental route trigger when enabled for a pilot environment |
+| `WalletHistoryTable` | Recent wallet deposits and withdrawals from the bounded wallet-history API |
+| `TransactionHistory` | Activity-page table of normalized on-chain events and vault-wide route visibility |
 | `YieldStatistics` | Yield route summary cards |
 
 ### Wallet connection
@@ -391,14 +518,15 @@ or do both.
 The vault calls `IPolkadotXCM(xcmPrecompileAddress).sendXcm(parachainId, assets, feeAssetItem, weightLimit)`.
 
 The XCM precompile is a special contract address that translates EVM calls into
-XCM messages. On Moonbeam it lives at `0x0000000000000000000000000000000000000800`.
+XCM messages. In the current repo/tooling truth, the Polkadot-style precompile
+address is `0x0000000000000000000000000000000000000801`.
 
 ### Current status on Paseo
 
-The XCM precompile **does not yet exist** on Paseo's EVM layer. The vault's
-`xcmPrecompileAddress` is set to `address(0)` by `setup-paseo.js`. Calling
-`address(0).sendXcm(...)` is a no-op on EVM — the transaction succeeds, all
-vault logic runs, events are emitted, but no cross-chain message is dispatched.
+The XCM precompile path is **not yet proven as a launch-safe workflow** on
+Paseo's EVM layer. The truthful operator posture is to keep routing paused in
+protected launch environments and treat any route-related Paseo activity as beta
+evaluation, not as proof of live cross-chain delivery.
 
 This means:
 - Deposits, withdrawals, and route events all work today
@@ -434,20 +562,26 @@ registered on Paseo.
 
 ```bash
 cd contracts
-npm test                          # All tests (excludes gas profile)
+npm test                          # Default prototype regression suite
+npm run test:launch               # Reduced-surface launch-contract suite
+npm run test:all                  # Full prototype sweep, including gas profile
 npm run coverage                  # Coverage report → coverage/index.html
-npm run gas                       # Gas profiling (AegisVault.gas.test.js)
+npm run gas                       # Prototype gas profile
 ```
 
 **Test files:**
 
 | File | What it covers |
 |------|---------------|
-| `test/AegisVault.test.js` | Deployment, access control, deposit/withdraw, reentrancy, risk gate, XCM routing, views |
-| `test/AegisVault.rebalance.test.js` | Rebalancing logic, deviation checks, deadlines |
-| `test/AegisVault.gas.test.js` | Gas budgets per function (currently failing for `routeYieldViaXCM` due to MockXCM overhead) |
+| `test/AegisVault.test.js` | Mixed prototype regression: vault-core behavior plus prototype-only routing coverage |
+| `test/AegisVault.rebalance.test.js` | Prototype-only rebalancing coverage kept for regression reference |
+| `test/AegisVault.gas.test.js` | Prototype gas profile: vault flows keep regression ceilings, route path is profiled separately |
+| `test/AegisVaultLaunch.test.js` | Reduced-surface launch contract coverage for ABI removal, one-token scope, pause controls, liability safety, and reentrancy |
 
-All tests use `MockXCM.sol` as the XCM precompile so they never hit a real network.
+All prototype tests use `MockXCM.sol` as the XCM precompile so they never hit a
+real network. Treat the prototype suites as prototype evidence and the launch
+suite as launch-contract source evidence. Final launch approval still requires
+`launch:verify` and `launch:prove` against a deployed `AegisVaultLaunch`.
 
 ### Frontend E2E tests
 
@@ -455,10 +589,12 @@ All tests use `MockXCM.sol` as the XCM precompile so they never hit a real netwo
 cd frontend
 npx playwright install chromium   # First time only
 npm run test:e2e
+npm run test:e2e:ci   # CI-oriented config; expects a separate build and uses port 3110
 ```
 
-The current suite (`tests/e2e/chat-cancel.spec.ts`) verifies that cancelling
-a routing intent does not submit a wallet transaction.
+The current suite verifies that cancelling a routing intent does not submit a
+wallet transaction and that activity/history/routing surfaces render explicit
+unavailable states instead of zero-like fallback data when their APIs fail.
 
 ### Adding a new contract test
 
@@ -493,17 +629,42 @@ test("description", async ({ page }) => {
 ```bash
 cd contracts
 
-# Full setup (recommended — deploys vault + tokens + configures everything)
+# Paseo demo setup only
 PRIVATE_KEY=0x... npm run setup
 
-# Vault only (if tokens already exist)
+# Paseo vault-only deploy helper
 PRIVATE_KEY=0x... npm run deploy
 
 # Mint tokens to a wallet
 PRIVATE_KEY=0x... RECIPIENT=0x<wallet> npm run mint
+
+# Protected launch bootstrap plan (multisig/operator use)
+npm run launch:prepare -- --profile moonbase-staging --mode plan
+
+# Static launch-profile gate used by CI
+npm run launch:check
+
+# Protected launch deployment
+npm run launch:deploy -- --profile moonbase-staging
+
+# Execute the emitted owner/multisig actions here.
+
+# Protected launch bootstrap verification
+npm run launch:verify -- --profile moonbase-staging --frontend-env ../frontend/.env.local
+
+# Protected launch deposit/withdraw proof
+npm run launch:prove -- --profile moonbase-staging
 ```
 
-After deployment, `contracts/deployments/paseo.json` contains all addresses.
+After prototype deployment, `contracts/deployments/paseo.json` contains the
+Paseo addresses. Protected launch deploys write `contracts/deployments/<profile>.json`.
+
+The protected launch configs live under `config/launch/`. They are the
+checked-in source of truth for Moonbase staging and Moonbeam pilot bootstrap
+inputs. The new launch scripts are intentionally limited to `AegisVaultLaunch`
+safety checks: launch token match, deposit/withdraw pause state, token metadata,
+token whitelist, owner/deployer separation, experimental-routing flag posture,
+and small deposit/withdraw smoke proofs through the live vault interface.
 
 ### Frontend deployment (Vercel)
 
@@ -516,19 +677,113 @@ After deployment, `contracts/deployments/paseo.json` contains all addresses.
 
 The `frontend/vercel.json` file is already configured.
 
+### Operator relay deployment (Railway)
+
+Use Railway when you need hosted server-side relay execution for the current
+Paseo operator workflow. Protected Moonbase staging still keeps hosted relay
+execution off until the route runtime is generalized beyond Paseo.
+
+1. Create a Railway service rooted at `frontend/`.
+2. Attach Railway Postgres.
+3. Set `AI_ORACLE_RELAY_ENABLED=true`.
+4. Set `AI_ORACLE_PRIVATE_KEY` as a dedicated server-side oracle secret.
+5. Set `AI_ORACLE_KEY_VERSION` and `AI_ORACLE_KEY_ROTATED_AT`.
+6. Set `AI_ORACLE_RELAY_DATABASE_URL` from Railway Postgres or rely on `DATABASE_URL`.
+7. Do **not** put `PRIVATE_KEY`, `BOOTSTRAP_OWNER_PRIVATE_KEY`, or `PROOF_WALLET_PRIVATE_KEY` in the frontend/Railway service env.
+8. Run `npm run relay:check-secrets`.
+9. Only set `NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING=true` if this deployment should expose the route UI.
+
+Railway-managed secrets plus Railway Postgres are acceptable for Paseo/lower
+environments. Moonbeam paid-pilot routing still needs HSM/KMS-class custody.
+
+### Operator key posture checks
+
+Use these before protected operator work or after any key rotation:
+
+```bash
+cd frontend
+npm run relay:check-secrets
+
+cd ../contracts
+npm run launch:check-key-posture -- --profile moonbase-staging
+npm run launch:check-key-posture -- --profile moonbeam-pilot
+```
+
+`relay:check-secrets` validates the active frontend/service env for forbidden key
+placement, relay metadata, storage posture, and on-chain signer/vault
+alignment. `launch:check-key-posture` validates deployer/owner separation plus
+metadata for launch-tooling keys against the checked-in launch profiles.
+
+### Operator monitoring baseline
+
+The repo now exposes:
+
+```bash
+curl http://127.0.0.1:3000/api/relay-health
+curl 'http://127.0.0.1:3000/api/relay-health?strict=1'
+```
+
+Use the default path for uptime/read-plane health. Use `?strict=1` when a
+monitor should treat degraded states as failures. The endpoint reports:
+
+- relay posture (`disabled`, `ok`, `degraded`, `failed`)
+- relay storage backend
+- Paseo signer/vault preflight when the relay is enabled
+- activity and portfolio read-path health
+- recent relay incident counts for submitted, failed, and alert-delivery states
+
+The canonical manual response guide for tx failure, rollback, paused routing,
+and key compromise is now
+`docs/project-management/AEGIS_705_RELEASE_SAFETY_RUNBOOKS.md`.
+The recurring contracts / infra / dependency / incident maintenance cadence is
+now `docs/project-management/AEGIS_903_MAINTENANCE_CHECKLIST.md`.
+
 ### Environment variables reference
 
 | Variable | Where used | Required | Description |
 |----------|-----------|----------|-------------|
-| `NEXT_PUBLIC_PASEO_RPC_URL` | Frontend + API | Yes | Paseo EVM RPC endpoint |
+| `NEXT_PUBLIC_AEGIS_ENV` | Frontend + API | Yes | Runtime selector: `paseo-beta` or `moonbase-staging` |
+| `NEXT_PUBLIC_PASEO_RPC_URL` | Frontend + API | Paseo only | Paseo EVM RPC endpoint |
+| `NEXT_PUBLIC_MOONBASE_RPC_URL` | Frontend + API | Moonbase staging only | Moonbase Alpha RPC endpoint |
 | `NEXT_PUBLIC_AEGIS_VAULT_ADDRESS` | Frontend + API | Yes | Deployed vault address |
-| `NEXT_PUBLIC_WPAS_ADDRESS` | Frontend | Yes | wPAS token address |
-| `NEXT_PUBLIC_TEST_USDC_ADDRESS` | Frontend + API | Yes | test-USDC token address |
+| `NEXT_PUBLIC_MOONBASE_STAGING_VAULT_ADDRESS` | Frontend + API | Moonbase staging only | Protected staging vault address override |
+| `NEXT_PUBLIC_WPAS_ADDRESS` | Frontend | Paseo only | wPAS token address |
+| `NEXT_PUBLIC_TEST_USDC_ADDRESS` | Frontend + API | Paseo only | test-USDC token address |
+| `NEXT_PUBLIC_MOONBASE_STAGING_TOKEN_ADDRESS` | Frontend + API | Moonbase staging only | Protected staging token address |
+| `NEXT_PUBLIC_MOONBASE_STAGING_TOKEN_SYMBOL` | Frontend | Moonbase staging only | Display symbol for the staging stable |
 | `DEST_PARACHAIN_ID` | API | No | Destination parachain (default: 1000) |
+| `NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING` | Frontend + API | No | Enables the experimental routing UI; pass `--frontend-env ../frontend/.env.local` to `launch:verify` when you want the launch check to verify the real frontend flag |
+| `AI_ORACLE_RELAY_ENABLED` | API only | No | Server-private gate for `POST /api/execute-route` |
 | `AI_ORACLE_PRIVATE_KEY` | API only | Yes | Oracle wallet private key (server-side secret) |
+| `AI_ORACLE_KEY_VERSION` | API/scripts only | Relay-enabled envs | Rotation label for the hosted oracle signer |
+| `AI_ORACLE_KEY_ROTATED_AT` | API/scripts only | Relay-enabled envs | ISO-8601 rotation timestamp for the hosted oracle signer |
+| `AI_ORACLE_RELAY_DATABASE_URL` | API only | No | Preferred Postgres-backed relay state store for hosted/operator deployments |
+| `DATABASE_URL` | API only | No | Alternate Postgres URL if `AI_ORACLE_RELAY_DATABASE_URL` is not set |
+| `AI_ORACLE_RELAY_ALLOW_FILE_STORE` | API only | No | Set `true` only for single-instance local prototype work |
+| `AI_ORACLE_RELAY_ALERT_WEBHOOK_URL` | API only | No | Generic webhook sink for best-effort relay failure alerts |
+| `AI_ORACLE_ALERT_WEBHOOK_AUTH_TOKEN` | API only | No | Optional bearer token added to the relay alert webhook request |
+| `AI_ORACLE_ALERT_SOURCE` | API only | No | Optional source label included in alert payloads |
+| `AI_ORACLE_ALERT_TIMEOUT_MS` | API only | No | Alert webhook timeout in milliseconds; defaults to 3000 |
+| `AI_ORACLE_RELAY_ALERT_ENVIRONMENT` | API only | No | Optional environment label for alert payloads |
+| `NEXT_PUBLIC_AEGIS_PRODUCT_INSTRUMENTATION_ENABLED` | Frontend + API | No | Enables first-party anonymous funnel instrumentation via `/api/instrumentation` |
 | `OPENAI_API_KEY` | API only | No | Enables OpenAI risk scoring |
 | `GEMINI_API_KEY` | API only | No | Enables Gemini risk scoring |
 | `NEXT_PUBLIC_E2E_MOCK_WALLET` | Frontend | No | Set `true` for E2E tests |
+| `RPC_URL` | Contract launch scripts | Protected launch only | Active Moonbase/Moonbeam RPC used by `launch:deploy`, `launch:prepare`, `launch:verify`, and `launch:prove` |
+| `PRIVATE_KEY` | Contract launch scripts | Protected launch only | Deployer private key; must match `AEGIS_DEPLOYER_ADDRESS` for `launch:deploy` |
+| `AEGIS_OWNER_ADDRESS` | Contract launch scripts | Protected launch only | Final launch-contract owner or multisig address |
+| `AEGIS_DEPLOYER_ADDRESS` | Contract launch scripts | Protected launch only | Expected deployer address derived from `PRIVATE_KEY` |
+| `AEGIS_VAULT_ADDRESS` | Contract launch scripts | After launch deploy | Deployed `AegisVaultLaunch` address used by `launch:prepare`, `launch:verify`, and `launch:prove` |
+| `BOOTSTRAP_OWNER_PRIVATE_KEY` | Contract launch scripts | Execute-mode only | Transitional owner key used only when `launch:prepare --mode execute` is intentionally allowed |
+| `PROOF_WALLET_PRIVATE_KEY` | Contract launch scripts | Launch proof only | Proof wallet used by `launch:prove` deposit/withdraw smoke flow |
+| `MOONBASE_STAGING_TOKEN_ADDRESS` | Contract launch scripts + frontend | Moonbase staging only | Protected staging launch token address |
+| `MOONBASE_STAGING_TOKEN_SYMBOL` | Contract launch scripts + frontend | Moonbase staging only | Protected staging launch token symbol |
+| `DEPLOYER_KEY_VERSION` | Contract launch scripts | When `PRIVATE_KEY` is loaded | Rotation label required by `launch:check-key-posture` for the deployer key |
+| `DEPLOYER_KEY_ROTATED_AT` | Contract launch scripts | When `PRIVATE_KEY` is loaded | ISO-8601 rotation timestamp required by `launch:check-key-posture` for the deployer key |
+| `BOOTSTRAP_OWNER_KEY_VERSION` | Contract launch scripts | When bootstrap key is loaded | Rotation label required by `launch:check-key-posture` for the transitional owner key |
+| `BOOTSTRAP_OWNER_KEY_ROTATED_AT` | Contract launch scripts | When bootstrap key is loaded | ISO-8601 rotation timestamp required by `launch:check-key-posture` for the transitional owner key |
+| `PROOF_WALLET_KEY_VERSION` | Contract launch scripts | When proof key is loaded | Rotation label required by `launch:check-key-posture` for the proof wallet key |
+| `PROOF_WALLET_KEY_ROTATED_AT` | Contract launch scripts | When proof key is loaded | ISO-8601 rotation timestamp required by `launch:check-key-posture` for the proof wallet key |
 
 ---
 
@@ -542,8 +797,9 @@ Be honest about this when presenting the project.
 | ERC-20 deposit / withdraw | ✅ Real | Real token transfers, real wallet signatures |
 | Risk gate enforcement | ✅ Real | On-chain revert if score >= 75 |
 | AI risk scoring (LLM) | 🟡 Optional | Works if `OPENAI_API_KEY` or `GEMINI_API_KEY` is set; keyword fallback otherwise |
-| On-chain route events | ✅ Real | `YieldRoutedViaXCM` and `XcmRouted` events are emitted |
-| XCM cross-chain transfer | ⏳ Pending | `xcmPrecompileAddress = address(0)` — no-op until Paseo ships the precompile |
+| Experimental route submission | 🟡 Gated | Disabled by default; UI requires `NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING=true`, server execution also requires `AI_ORACLE_RELAY_ENABLED=true` plus relay storage/signer config |
+| On-chain route events | ✅ Real | Route-related events can be emitted when experimental routing is enabled |
+| XCM cross-chain transfer | ⏳ Pending | Protected launch tooling keeps routing paused; the repo does not yet prove a live Moonbeam-safe XCM path |
 | APY / yield data | ❌ Simulated | Hardcoded to 0; real APY requires an off-chain indexer + price feeds |
 | Token prices | ❌ Simulated | Mock tokens have no market price |
 | Destination vault | ❌ Simulated | `DESTINATION_VAULT_ADDRESS` is a placeholder |
@@ -568,31 +824,55 @@ stored in the vault. Either:
 - Use the same private key that was used to deploy (the deployer is set as oracle by default)
 - Or call `vault.setAIOracleAddress(newAddress)` from the owner wallet
 
+### execute-route returns 503 "Experimental route relay is disabled"
+The deployment is running with the server-side relay off. Set
+`AI_ORACLE_RELAY_ENABLED=true` only for an explicit operator-controlled Paseo
+deployment. `NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING=true` only affects the UI.
+
+### execute-route returns 503 "Durable relay storage is not configured"
+Set `AI_ORACLE_RELAY_DATABASE_URL=postgresql://...` or `DATABASE_URL=postgresql://...`
+for hosted/operator deployments. Only use `AI_ORACLE_RELAY_ALLOW_FILE_STORE=true`
+for single-instance local prototype work.
+
 ### execute-route returns 501 "AI_ORACLE_PRIVATE_KEY not set"
-Add `AI_ORACLE_PRIVATE_KEY=0x<key>` to `frontend/.env.local` and restart the dev server.
+Add `AI_ORACLE_PRIVATE_KEY=0x<key>` to `frontend/.env.local` or the hosted server
+env and restart the app.
+
+### execute-route returns `failed` with retry guidance or alert status
+Inspect `failureCategory`, `retryDisposition`, `operatorAction`, and
+`operatorAlertStatus` in the response body. The current relay adds guidance and
+best-effort webhook alerting, but it does **not** run automatic retries or a
+background job queue.
 
 ### VaultStats shows 0 for everything
 The vault address in `.env.local` is wrong or the contract is the old version.
 Re-run `npm run setup` and update `.env.local` with the new address.
+
+### Wallet history does not show relay requests
+This is expected. The wallet-history API is intentionally limited to recent
+on-chain deposits and withdrawals. Private relay follow-up stays on the direct
+route response and request-status path instead of the generic wallet-history
+surface.
 
 ### Build fails with "Too many re-renders"
 This was a pre-existing bug in `TransactionHistory.tsx` — fixed in this session.
 Run `npm run build` again.
 
 ### Contract tests fail
-Run `cd contracts && npm install` first. The gas test for `routeYieldViaXCM`
-is expected to fail (MockXCM overhead exceeds the 200k budget) — this is tracked
-separately and does not affect functionality.
+Run `cd contracts && npm install` first. `npm test` is the passing prototype
+regression suite, and `npm run gas` profiles the prototype route path
+separately. Neither command is launch-contract approval evidence for the future
+reduced-surface Moonbeam deployment.
 
 ### XCM routing reverts on-chain
-Check `xcmPrecompileAddress` — if it is not `address(0)` and the precompile
-doesn't exist at that address, the call will revert. Run:
+Do not treat this as something to "fix" by pointing the vault at `address(0)`.
+The current launch-safe posture is to keep routing paused, verify the bootstrap
+state, and avoid using route execution as proof until the target-chain path is
+adapted and verified. For protected environments, re-run:
+
 ```bash
-# From owner wallet — set back to address(0) for graceful no-op
-cast send <VAULT_ADDRESS> "setXCMPrecompileAddress(address)" \
-  0x0000000000000000000000000000000000000000 \
-  --rpc-url https://eth-rpc-testnet.polkadot.io \
-  --private-key $PRIVATE_KEY
+cd contracts
+npm run launch:verify -- --profile moonbeam-pilot --frontend-env ../frontend/.env.local
 ```
 
 ---
@@ -602,8 +882,10 @@ cast send <VAULT_ADDRESS> "setXCMPrecompileAddress(address)" \
 ### Immediate (unblocked today)
 
 - [ ] Run `npm run setup` to redeploy the current contract version
+- [ ] Decide whether this deployment is public beta (`AI_ORACLE_RELAY_ENABLED=false`) or an operator-controlled relay workflow (`AI_ORACLE_RELAY_ENABLED=true`)
 - [ ] Set `AI_ORACLE_PRIVATE_KEY` in `frontend/.env.local`
-- [ ] Make your first real deposit and route transaction
+- [ ] Make your first real deposit in the vault-only beta
+- [ ] Decide whether you actually need experimental routing enabled for a pilot environment
 - [ ] Add `OPENAI_API_KEY` or `GEMINI_API_KEY` for real AI scoring
 
 ### Short term
@@ -614,7 +896,9 @@ cast send <VAULT_ADDRESS> "setXCMPrecompileAddress(address)" \
 - [ ] **Validate XCM encoding** — test `xcm-encoder.ts` output against the live
   precompile with a small amount. The encoding follows the spec but has not been
   validated against a real precompile call.
-- [ ] **Deploy to Vercel** — push to GitHub, connect to Vercel, set env vars.
+- [ ] **Deploy the public beta to Vercel** — push to GitHub, connect to Vercel, set env vars.
+- [ ] **Deploy relay-enabled lower environments to Railway** — attach Postgres, set `AI_ORACLE_RELAY_ENABLED`, and keep the signer key server-side only.
+- [ ] **Wire operator alert routing if needed** — set `AI_ORACLE_RELAY_ALERT_WEBHOOK_URL` plus optional auth/source envs for best-effort relay failure alerts.
 - [ ] **Add more E2E tests** — deposit flow, withdrawal flow, risk gate rejection.
 
 ### Medium term

@@ -2,12 +2,13 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/Users/ekf/Downloads/Projects/Polka Agent/aegis protocol/contracts/contracts/AegisVault.sol": {
-      "lastModificationDate": 1774504965850,
-      "contentHash": "b8cfb16a24126f9fb1ff8cba9ad30207",
+      "lastModificationDate": 1774637604673,
+      "contentHash": "41803e53ec95fd5fd6714a63ff515a93",
       "sourceName": "contracts/AegisVault.sol",
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -50,6 +51,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -86,6 +88,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -124,6 +127,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -162,6 +166,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -201,6 +206,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -237,6 +243,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -273,6 +280,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -312,6 +320,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -348,6 +357,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -384,6 +394,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -420,6 +431,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -458,6 +470,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -499,6 +512,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -537,6 +551,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -576,6 +591,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -614,6 +630,7 @@
       "solcConfig": {
         "version": "0.8.20",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -641,6 +658,85 @@
       ],
       "artifacts": [
         "MockXCM"
+      ]
+    },
+    "/Users/ekf/Downloads/Projects/Polka Agent/aegis protocol/contracts/contracts/MockXCM.sol": {
+      "lastModificationDate": 1774551225685,
+      "contentHash": "1742b80940b010848dd0eb1a9fb076d3",
+      "sourceName": "contracts/MockXCM.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "MockXCM"
+      ]
+    },
+    "/Users/ekf/Downloads/Projects/Polka Agent/aegis protocol/contracts/contracts/AegisVaultLaunch.sol": {
+      "lastModificationDate": 1775566673514,
+      "contentHash": "b9450c050929488eb108a9698cbf8d93",
+      "sourceName": "contracts/AegisVaultLaunch.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/access/Ownable.sol",
+        "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol",
+        "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "AegisVaultLaunch"
       ]
     }
   }

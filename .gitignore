@@ -12,4 +12,8 @@ node_modules/
 
 # Build
 .next/
+frontend/.aegis-relay/
 out/
+
+# Local project-management workspace
+docs/

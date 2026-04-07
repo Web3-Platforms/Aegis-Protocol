@@ -1,0 +1,38 @@
+{
+  "profile": "moonbeam-pilot",
+  "launchMode": "vault_only",
+  "network": {
+    "name": "Moonbeam mainnet",
+    "chainId": 1284,
+    "rpcEnv": "RPC_URL"
+  },
+  "vault": {
+    "addressEnv": "AEGIS_VAULT_ADDRESS",
+    "ownerAddressEnv": "AEGIS_OWNER_ADDRESS",
+    "deployerAddressEnv": "AEGIS_DEPLOYER_ADDRESS",
+    "bootstrapOwnerKeyEnv": "BOOTSTRAP_OWNER_PRIVATE_KEY",
+    "requireOwnerContract": true
+  },
+  "operations": {
+    "expectedDepositsPaused": false,
+    "expectedWithdrawalsPaused": false
+  },
+  "frontend": {
+    "experimentalRoutingEnv": "NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING",
+    "expectedExperimentalRouting": false
+  },
+  "tokens": [
+    {
+      "label": "Moonbeam launch stable",
+      "address": "0xFFfffffF7D2B0B761Af01Ca8e25242976ac0aD7D",
+      "symbol": "xcUSDC",
+      "decimals": 6,
+      "smokeTestAmount": "1.0",
+      "assetRegistry": {
+        "reserveParachainId": 1000,
+        "reserveAssetId": 1337,
+        "packedLocator": 1000001337
+      }
+    }
+  ]
+}

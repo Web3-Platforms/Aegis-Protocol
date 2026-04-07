@@ -12,14 +12,21 @@ import {
   AEGIS_VAULT_ABI,
   ERC20_ABI,
   CONTRACT_ADDRESSES,
+  HAS_CONFIGURED_SUPPORTED_TOKENS,
+  HAS_CONFIGURED_VAULT,
   SUPPORTED_TOKENS,
 } from "@/lib/contracts";
+import { dispatchPortfolioRefresh } from "@/lib/portfolio-refresh";
+import { trackProductEvent } from "@/lib/product-instrumentation";
+import { AEGIS_RUNTIME } from "@/lib/runtime/environment";
 
 type SupportedToken = (typeof SUPPORTED_TOKENS)[number];
 
 export function DepositForm() {
   const { address, isConnected } = useAccount();
-  const [selectedToken, setSelectedToken] = useState<SupportedToken>(SUPPORTED_TOKENS[0]);
+  const [selectedToken, setSelectedToken] = useState<SupportedToken | null>(
+    SUPPORTED_TOKENS[0] ?? null
+  );
   const [depositAmount, setDepositAmount] = useState("");
   const [step, setStep] = useState<"idle" | "approving" | "depositing">("idle");
   const [error, setError] = useState("");
@@ -28,28 +35,42 @@ export function DepositForm() {
 
   // ── Read wallet balance for the selected token ──────────────────────────
   const { data: rawBalance, refetch: refetchBalance } = useReadContract({
-    address: selectedToken.address as `0x${string}`,
+    address: (selectedToken?.address ?? CONTRACT_ADDRESSES.AEGIS_VAULT) as `0x${string}`,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: isConnected && !!address },
+    query: {
+      enabled:
+        isConnected &&
+        !!address &&
+        !!selectedToken &&
+        HAS_CONFIGURED_VAULT &&
+        HAS_CONFIGURED_SUPPORTED_TOKENS,
+    },
   });
 
   const formattedBalance =
     rawBalance !== undefined
-      ? formatUnits(rawBalance as bigint, selectedToken.decimals)
+      ? formatUnits(rawBalance as bigint, selectedToken?.decimals ?? 18)
       : "0";
 
   // ── Read current allowance for the vault ────────────────────────────────
   const { data: rawAllowance, refetch: refetchAllowance } = useReadContract({
-    address: selectedToken.address as `0x${string}`,
+    address: (selectedToken?.address ?? CONTRACT_ADDRESSES.AEGIS_VAULT) as `0x${string}`,
     abi: ERC20_ABI,
     functionName: "allowance",
     args:
       address
         ? [address, CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`]
         : undefined,
-    query: { enabled: isConnected && !!address },
+    query: {
+      enabled:
+        isConnected &&
+        !!address &&
+        !!selectedToken &&
+        HAS_CONFIGURED_VAULT &&
+        HAS_CONFIGURED_SUPPORTED_TOKENS,
+    },
   });
 
   // ── Write hooks ─────────────────────────────────────────────────────────
@@ -76,6 +97,9 @@ export function DepositForm() {
   // ── Trigger deposit after approval confirms ─────────────────────────────
   useEffect(() => {
     if (isApproveConfirmed && step === "approving" && depositAmount) {
+      if (!selectedToken) {
+        return;
+      }
       setStep("depositing");
       const amount = parseUnits(depositAmount, selectedToken.decimals);
       writeDeposit({
@@ -93,59 +117,21 @@ export function DepositForm() {
       setStep("idle");
       setDepositAmount("");
 
-      const baseSuccess = "Deposit successful! Your assets are now earning yield.";
+      const baseSuccess = "Deposit successful. Assets are now recorded in the beta vault.";
 
       refetchBalance();
       refetchAllowance();
+      dispatchPortfolioRefresh();
       setSuccess(baseSuccess);
 
-      // MVP Option A: routing is triggered by the deposit (for the routed asset only).
-      // This calls the oracle/relay signing endpoint; if it isn't configured locally,
-      // the deposit still succeeds and routing will fail gracefully.
-      if (address && isConnected && selectedToken.symbol === "USDC") {
-        (async () => {
-          try {
-            setIsRouting(true);
-            const resp = await fetch("/api/execute-route", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userAddress: address,
-                intent: "deposit",
-              }),
-            });
-
-            const json = await resp.json();
-            if (!resp.ok) {
-              setSuccess(
-                `${baseSuccess}\nRouting not executed: ${json?.error ?? "unknown error"}`
-              );
-              return;
-            }
-
-            setSuccess(
-              `${baseSuccess}\nRoute execution submitted.\nTx: ${json.txHash}`
-            );
-          } catch (e) {
-            setSuccess(
-              `${baseSuccess}\nRouting not executed in this environment.`
-            );
-          } finally {
-            setIsRouting(false);
-          }
-        })();
-      } else {
-        setSuccess(baseSuccess);
-      }
+      // Launch mode is vault-only beta, so deposits do not auto-submit routing.
+      setIsRouting(false);
     }
   }, [
     isDepositConfirmed,
     step,
     refetchBalance,
     refetchAllowance,
-    address,
-    isConnected,
-    selectedToken.symbol,
   ]);
 
   // ── Form handler ────────────────────────────────────────────────────────
@@ -156,18 +142,65 @@ export function DepositForm() {
     resetApprove();
     resetDeposit();
 
+    if (!HAS_CONFIGURED_VAULT || !selectedToken) {
+      void trackProductEvent({
+        eventName: "deposit_blocked",
+        surface: "vault",
+        metadata: {
+          tokenSymbol: selectedToken?.symbol,
+          blockReason: "missing_configuration",
+        },
+      });
+      setError(
+        `This ${AEGIS_RUNTIME.postureLabel.toLowerCase()} environment is missing vault or token configuration.`
+      );
+      return;
+    }
+
     if (!depositAmount || isNaN(Number(depositAmount))) {
+      void trackProductEvent({
+        eventName: "deposit_blocked",
+        surface: "vault",
+        metadata: {
+          tokenSymbol: selectedToken.symbol,
+          blockReason: "invalid_amount",
+        },
+      });
       setError("Please enter a valid amount");
       return;
     }
     if (Number(depositAmount) <= 0) {
+      void trackProductEvent({
+        eventName: "deposit_blocked",
+        surface: "vault",
+        metadata: {
+          tokenSymbol: selectedToken.symbol,
+          blockReason: "invalid_amount",
+        },
+      });
       setError("Amount must be greater than 0");
       return;
     }
     if (Number(depositAmount) > Number(formattedBalance)) {
+      void trackProductEvent({
+        eventName: "deposit_blocked",
+        surface: "vault",
+        metadata: {
+          tokenSymbol: selectedToken.symbol,
+          blockReason: "insufficient_wallet_balance",
+        },
+      });
       setError("Insufficient wallet balance");
       return;
     }
+
+    void trackProductEvent({
+      eventName: "deposit_attempted",
+      surface: "vault",
+      metadata: {
+        tokenSymbol: selectedToken.symbol,
+      },
+    });
 
     const amount = parseUnits(depositAmount, selectedToken.decimals);
     const currentAllowance = (rawAllowance as bigint) ?? 0n;
@@ -195,7 +228,7 @@ export function DepositForm() {
 
   // ── Max button handler ──────────────────────────────────────────────────
   const handleMax = () => {
-    if (rawBalance !== undefined) {
+    if (rawBalance !== undefined && selectedToken) {
       setDepositAmount(formatUnits(rawBalance as bigint, selectedToken.decimals));
     }
   };
@@ -211,7 +244,7 @@ export function DepositForm() {
   const buttonLabel = (() => {
     if (isApprovePending || isApproveConfirming) return "Approving…";
     if (isDepositPending || isDepositConfirming) return "Depositing…";
-    return "Deposit Funds";
+    return "Deposit to Beta Vault";
   })();
 
   if (!isConnected) {
@@ -222,8 +255,24 @@ export function DepositForm() {
         </div>
         <div>
           <h3 className="font-bold text-lg">Wallet Not Connected</h3>
-          <p className="text-sm text-muted-foreground max-w-xs mx-auto">Please connect your wallet to interact with the Aegis Vault and deposit assets.</p>
+          <p className="text-sm text-muted-foreground max-w-xs mx-auto">Please connect your wallet to use the Aegis beta vault.</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!HAS_CONFIGURED_VAULT || !HAS_CONFIGURED_SUPPORTED_TOKENS || !selectedToken) {
+    return (
+      <div className="aegis-panel p-8 space-y-4 border border-dashed">
+        <div>
+          <h3 className="font-bold text-lg">Environment Configuration Required</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This {AEGIS_RUNTIME.postureLabel.toLowerCase()} runtime needs a vault address and at least one supported token before deposits can be enabled.
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Configure `NEXT_PUBLIC_AEGIS_VAULT_ADDRESS` for Paseo, or `NEXT_PUBLIC_MOONBASE_STAGING_VAULT_ADDRESS` plus `NEXT_PUBLIC_MOONBASE_STAGING_TOKEN_ADDRESS` for Moonbase staging.
+        </p>
       </div>
     );
   }
@@ -232,7 +281,9 @@ export function DepositForm() {
     <div className="aegis-panel overflow-hidden">
       <div className="bg-primary p-6 text-primary-foreground">
         <h2 className="text-xl font-bold tracking-tight">Deposit Assets</h2>
-        <p className="text-sm opacity-80">Allocate capital to the AI-guarded yield vault</p>
+        <p className="text-sm opacity-80">
+          Deposit supported assets into the {AEGIS_RUNTIME.chainName} vault surface
+        </p>
       </div>
       
       <form onSubmit={handleDeposit} className="p-6 space-y-6">
@@ -287,14 +338,14 @@ export function DepositForm() {
 
         <div className="p-4 rounded-xl bg-secondary/30 border border-dashed space-y-2">
           <div className="flex justify-between text-xs font-medium">
-            <span className="text-muted-foreground">Estimated Yield</span>
+            <span className="text-muted-foreground">Launch Mode</span>
             <span className="text-muted-foreground font-bold">
-              Simulated for MVP beta
+              Vault-only beta
             </span>
           </div>
           <div className="flex justify-between text-xs font-medium">
-            <span className="text-muted-foreground">Security Rating</span>
-            <span className="text-indigo-600 font-bold">AI risk gate (prototype)</span>
+            <span className="text-muted-foreground">Routing</span>
+            <span className="text-indigo-600 font-bold">Separate experimental workflow</span>
           </div>
         </div>
 

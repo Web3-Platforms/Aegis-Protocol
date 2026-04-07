@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { BrandMark } from "@/components/BrandMark";
+import { useHydrated } from "@/lib/use-hydrated";
+import { AEGIS_RUNTIME } from "@/lib/runtime/environment";
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
@@ -20,6 +22,7 @@ export function Navbar() {
   const { disconnect } = useDisconnect();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const hasMounted = useHydrated();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -78,10 +81,10 @@ export function Navbar() {
         <div className="flex items-center gap-4">
           <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/50 border text-xs font-medium text-muted-foreground">
             <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            Paseo Testnet
+            {AEGIS_RUNTIME.chainName}
           </div>
 
-          {isConnected && address ? (
+          {hasMounted ? isConnected && address ? (
             <div className="relative">
               <button
                 onClick={() => setIsDropdownOpen((open) => !open)}
@@ -122,6 +125,11 @@ export function Navbar() {
             <button onClick={handleConnect} className="aegis-button aegis-button-primary">
               Connect Wallet
             </button>
+          ) : (
+            <div
+              aria-hidden="true"
+              className="h-10 w-32 rounded-full bg-secondary/50 animate-pulse"
+            />
           )}
         </div>
       </div>

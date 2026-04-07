@@ -8,8 +8,8 @@
  *   2. Deploys MockERC20 tokens: wPAS (decimals 10) and test-USDC (decimals 6)
  *   3. Mints 10,000 of each token to the deployer
  *   4. Registers both tokens as supported in the vault
- *   5. Sets xcmPrecompileAddress to address(0) so XCM calls are skipped
- *      gracefully until the real precompile is available on Paseo
+ *   5. Leaves the default XCM precompile address at 0x...0801 and records it
+ *      for demo/testnet use; route execution is still not launch-safe on Paseo
  *   6. Writes deployments/paseo.json with all addresses
  *   7. Prints the .env.local block to paste into frontend/.env.local
  *
@@ -78,18 +78,12 @@ async function main() {
   await tx2.wait();
   console.log(`     addSupportedToken(USDC) ✅`);
 
-  // ── 4. Set XCM precompile to zero address (graceful no-op until live) ───
-  // The XCM precompile at 0x...0801 does not exist on Paseo's EVM layer yet.
-  // Setting it to address(0) means routeYieldViaXCM will call address(0).sendXcm()
-  // which is a no-op on EVM — the transaction succeeds, events are emitted,
-  // and the UI flow works end-to-end without reverting.
-  // When Polkadot Hub ships the XCM precompile, call setXCMPrecompileAddress(realAddr).
-  console.log("4/5  Setting XCM precompile to address(0) (graceful no-op)...");
-  const tx3 = await vault.setXCMPrecompileAddress(
-    "0x0000000000000000000000000000000000000000"
-  );
-  await tx3.wait();
-  console.log(`     setXCMPrecompileAddress(0x0) ✅`);
+  // ── 4. Record the current XCM precompile placeholder ──────────────────────
+  // The contract defaults to 0x...0801 and rejects address(0). Keep this
+  // placeholder for local/demo work, but do not treat the route path as
+  // launch-safe on Paseo until the target precompile/runtime path is proven.
+  const xcmPrecompileAddress = await vault.xcmPrecompileAddress();
+  console.log(`4/5  Leaving XCM precompile at default placeholder ${xcmPrecompileAddress}`);
 
   // ── 5. Write deployment record ──────────────────────────────────────────
   console.log("5/5  Writing deployment record...");
@@ -102,8 +96,9 @@ async function main() {
     aegisVault: vaultAddress,
     wPAS: wPASAddress,
     testUSDC: testUSDCAddress,
-    xcmPrecompile: "0x0000000000000000000000000000000000000000",
-    notes: "XCM precompile set to address(0) — no-op until Paseo ships the real precompile",
+    xcmPrecompile: xcmPrecompileAddress,
+    notes:
+      "XCM precompile left at the contract default placeholder; keep route execution disabled/experimental until the target precompile path is proven",
   };
 
   const deploymentsDir = path.join(__dirname, "..", "deployments");
@@ -119,7 +114,7 @@ async function main() {
 AegisVault : ${vaultAddress}
 wPAS       : ${wPASAddress}
 test-USDC  : ${testUSDCAddress}
-AI Oracle  : ${deployer.address}  (same as deployer — set AI_ORACLE_PRIVATE_KEY to this wallet's key)
+AI Oracle  : ${deployer.address}  (same as deployer for this local/demo setup only)
 
 === Paste this into frontend/.env.local ===
 
@@ -131,14 +126,18 @@ NEXT_PUBLIC_USDC_TOKEN_ADDRESS=${testUSDCAddress}
 DEST_PARACHAIN_ID=1000
 NEXT_PUBLIC_E2E_MOCK_WALLET=false
 AI_ORACLE_PRIVATE_KEY=0x<your-private-key-here>
+# Optional rotation metadata for operator checks:
+# AI_ORACLE_KEY_VERSION=oracle-paseo-local-001
+# AI_ORACLE_KEY_ROTATED_AT=${new Date().toISOString()}
 
 === Next Steps ===
 
 1. Copy the block above into frontend/.env.local
-2. Set AI_ORACLE_PRIVATE_KEY to the private key of ${deployer.address}
-3. Run: cd frontend && npm run dev
-4. Connect your wallet (MetaMask on Paseo Testnet, chainId 420420417)
-5. Get test tokens: run the faucet script below or mint manually
+2. For quick local/demo work only, set AI_ORACLE_PRIVATE_KEY to the private key of ${deployer.address}
+3. For Railway or protected operator environments, rotate to a dedicated oracle wallet, call setAIOracleAddress(newOracle), and store only that dedicated oracle key in the server env
+4. Run: cd frontend && npm run dev
+5. Connect your wallet (MetaMask on Paseo Testnet, chainId 420420417)
+6. Get test tokens: run the faucet script below or mint manually
 
 To mint test tokens to your wallet:
   cd contracts

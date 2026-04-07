@@ -1,29 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import { SUPPORTED_TOKENS } from "@/lib/contracts";
+import { AEGIS_RUNTIME } from "@/lib/runtime/environment";
 
 const features = [
   {
-    title: "AI-Gated Routing",
-    description: "Every intent is analyzed by our risk oracle before capital moves, blocking unsafe routes automatically.",
+    title: "Vault Beta",
+    description: `Connect a wallet and use supported deposit and withdraw flows on ${AEGIS_RUNTIME.chainName}.`,
     icon: "🛡️",
     color: "bg-primary/10 text-primary"
   },
   {
-    title: "Yield Aggregation",
-    description: "Access deep liquidity and optimized yield across the entire Polkadot ecosystem from a single vault.",
+    title: "Route Evaluation",
+    description: "Intent prompts are scored by the current policy-based oracle before any experimental route submission is shown.",
     icon: "📈",
     color: "bg-indigo-500/10 text-indigo-600"
   },
   {
-    title: "Cross-Chain native",
-    description: "Built on XCM primitives for seamless asset transfers between parachains with minimal slippage.",
+    title: "Experimental Routing",
+    description: "XCM-related routing remains a testnet evaluation path and is not a live production-safe launch feature.",
     icon: "🔗",
     color: "bg-emerald-500/10 text-emerald-600"
   },
 ];
 
 export default function Home() {
+  const supportedAssetSummary =
+    SUPPORTED_TOKENS.length > 1
+      ? `${AEGIS_RUNTIME.chainName} assets: ${SUPPORTED_TOKENS.map((token) => token.symbol).join(" and ")}`
+      : `${AEGIS_RUNTIME.chainName} asset: ${SUPPORTED_TOKENS[0]?.symbol ?? "Configured staging token"}`;
+
   return (
     <div className="flex flex-col space-y-20 pb-20">
       {/* Hero Section */}
@@ -33,35 +40,38 @@ export default function Home() {
           <div className="max-w-3xl space-y-8 animate-fade-in">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-primary text-xs font-bold uppercase tracking-widest">
               <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-              Paseo Testnet Live
+              {AEGIS_RUNTIME.statusBadge}
             </div>
             
             <h1 className="text-5xl md:text-7xl font-black tracking-tighter leading-[1.1]">
-              The intelligent yield layer for <span className="text-primary">Polkadot.</span>
+              The pilot-first vault beta for <span className="text-primary">Polkadot.</span>
             </h1>
             
             <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl">
-              Aegis is an intent-based, AI-guarded vault protocol. We route your capital to the safest, highest-performing yield strategies across the Hub.
+              Aegis currently supports deposit and withdraw flows for supported assets on {AEGIS_RUNTIME.chainName}. Routing assessment and XCM-related workflows remain experimental beta tools, not live launch features.
             </p>
             
             <div className="flex flex-wrap gap-4 pt-4">
               <Link href="/vault" className="aegis-button h-14 px-8 bg-primary text-primary-foreground text-lg font-bold shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
-                Launch App
+                Open Vault
               </Link>
               <Link href="/chat" className="aegis-button h-14 px-8 border-2 text-lg font-bold transition-all hover:bg-secondary active:scale-95">
-                Chat with Assistant
+                Review Beta Assistant
               </Link>
             </div>
 
             <div className="flex items-center gap-6 pt-8 text-sm font-medium text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span className="text-xl">✅</span> AI-Verified
+                <span className="text-xl">✅</span> Vault Beta
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xl">✅</span> XCM-Enabled
+                <span className="text-xl">🧪</span> Route Evaluation Only
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xl">✅</span> Non-Custodial
+                <span className="text-xl">📍</span>{" "}
+                {AEGIS_RUNTIME.env === "moonbase-staging"
+                  ? "Staging-only Today"
+                  : "Testnet-only Today"}
               </div>
             </div>
           </div>
@@ -78,33 +88,27 @@ export default function Home() {
                 <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" />
               </div>
               <div>
-                <p className="font-bold">Paseo Hub</p>
-                <p className="text-xs text-muted-foreground">Connected & Syncing</p>
+                <p className="font-bold">{AEGIS_RUNTIME.chainName}</p>
+                <p className="text-xs text-muted-foreground">{AEGIS_RUNTIME.postureDescription}</p>
               </div>
             </div>
           </div>
           
           <div className="space-y-4 md:border-x px-0 md:px-8">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Total Value Guarded</p>
-            <div className="flex items-end gap-2">
-              <p className="text-4xl font-black tracking-tight">—</p>
-              <p className="text-sm font-bold text-muted-foreground pb-1">
-                MVP beta (simulated)
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Launch Mode</p>
+            <div className="space-y-1">
+              <p className="text-3xl font-black tracking-tight">Vault-only beta</p>
+              <p className="text-sm font-bold text-muted-foreground">
+                Routing stays experimental until protected pilot proof exists.
               </p>
             </div>
           </div>
 
           <div className="space-y-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Active Strategies</p>
-            <div className="flex -space-x-2">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="h-10 w-10 rounded-full border-2 border-background bg-secondary flex items-center justify-center font-bold text-xs">
-                  P{i}
-                </div>
-              ))}
-              <div className="h-10 w-10 rounded-full border-2 border-background bg-primary text-primary-foreground flex items-center justify-center font-bold text-xs">
-                +8
-              </div>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Supported Assets</p>
+            <div className="space-y-1">
+              <p className="font-bold">{supportedAssetSummary}</p>
+              <p className="text-xs text-muted-foreground">Configured environment assets only; not launch-asset proof.</p>
             </div>
           </div>
         </div>
@@ -113,8 +117,8 @@ export default function Home() {
       {/* Features Section */}
       <section className="aegis-shell space-y-12">
         <div className="text-center space-y-4">
-          <h2 className="text-3xl font-bold tracking-tight">Engineered for Security</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto font-medium">Built from the ground up to protect your capital while maximizing yield potential.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Vault Beta and Evaluation Tools</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto font-medium">Built to keep the current runtime story aligned with what is live on {AEGIS_RUNTIME.chainName} today and what remains experimental.</p>
         </div>
         
         <div className="grid md:grid-cols-3 gap-8">
@@ -141,18 +145,18 @@ export default function Home() {
           <div className="absolute top-0 right-0 w-1/3 h-full bg-white/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="relative z-10 max-w-2xl space-y-8">
             <h2 className="text-4xl md:text-5xl font-black leading-tight tracking-tight">
-              Ready to automate your yield routing?
+              Explore the vault-only beta.
             </h2>
             <p className="text-xl opacity-80 leading-relaxed font-medium">
-              Join the future of intent-based DeFi. Connect your wallet and let Aegis find the best opportunities for you.
+              Use today&apos;s deposit and withdraw flows on {AEGIS_RUNTIME.chainName}, or review the experimental routing assistant with environment-appropriate expectations.
             </p>
             <div className="flex flex-wrap gap-4 pt-4">
               <Link href="/vault" className="h-14 px-10 bg-white text-primary rounded-xl flex items-center justify-center font-bold text-lg hover:bg-opacity-90 transition-all active:scale-95">
                 Open Vault
               </Link>
-              <button className="h-14 px-8 border-2 border-white/20 rounded-xl font-bold text-lg hover:bg-white/10 transition-all active:scale-95">
-                View Documentation
-              </button>
+              <Link href="/chat" className="h-14 px-8 border-2 border-white/20 rounded-xl font-bold text-lg hover:bg-white/10 transition-all active:scale-95 flex items-center justify-center">
+                Review Beta Assistant
+              </Link>
             </div>
           </div>
         </div>

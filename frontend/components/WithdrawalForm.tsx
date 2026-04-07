@@ -1,30 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits } from "viem";
-import { AEGIS_VAULT_ABI, CONTRACT_ADDRESSES, SUPPORTED_TOKENS } from "@/lib/contracts";
+import {
+  AEGIS_VAULT_ABI,
+  CONTRACT_ADDRESSES,
+  HAS_CONFIGURED_SUPPORTED_TOKENS,
+  HAS_CONFIGURED_VAULT,
+  SUPPORTED_TOKENS,
+} from "@/lib/contracts";
+import { dispatchPortfolioRefresh } from "@/lib/portfolio-refresh";
+import { trackProductEvent } from "@/lib/product-instrumentation";
+import { AEGIS_RUNTIME } from "@/lib/runtime/environment";
 
 type SupportedToken = (typeof SUPPORTED_TOKENS)[number];
 
 export function WithdrawalForm() {
   const { address, isConnected } = useAccount();
-  const [selectedToken, setSelectedToken] = useState<SupportedToken>(SUPPORTED_TOKENS[0]);
+  const [selectedToken, setSelectedToken] = useState<SupportedToken | null>(
+    SUPPORTED_TOKENS[0] ?? null
+  );
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const { data: depositBalance } = useReadContract({
+  const { data: depositBalance, refetch: refetchDepositBalance } = useReadContract({
     address: CONTRACT_ADDRESSES.AEGIS_VAULT as `0x${string}`,
     abi: AEGIS_VAULT_ABI,
     functionName: "getUserDeposit",
     args: address && selectedToken ? [address, selectedToken.address as `0x${string}`] : undefined,
-    query: { enabled: !!address && !!selectedToken },
+    query: {
+      enabled:
+        !!address &&
+        !!selectedToken &&
+        HAS_CONFIGURED_VAULT &&
+        HAS_CONFIGURED_SUPPORTED_TOKENS,
+    },
   });
 
   // Derive display balance directly from contract data — no intermediate state needed.
   const userBalance = depositBalance
-    ? (Number(depositBalance) / Math.pow(10, selectedToken.decimals)).toFixed(6)
+    ? (Number(depositBalance) / Math.pow(10, selectedToken?.decimals ?? 18)).toFixed(6)
     : "0";
 
   const { writeContract, data: hash, isPending } = useWriteContract();
@@ -32,27 +49,81 @@ export function WithdrawalForm() {
     hash,
   });
 
+  useEffect(() => {
+    if (isSuccess) {
+      void refetchDepositBalance();
+      dispatchPortfolioRefresh();
+    }
+  }, [isSuccess, refetchDepositBalance]);
+
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
+    if (!HAS_CONFIGURED_VAULT || !selectedToken) {
+      void trackProductEvent({
+        eventName: "withdrawal_blocked",
+        surface: "vault",
+        metadata: {
+          tokenSymbol: selectedToken?.symbol,
+          blockReason: "missing_configuration",
+        },
+      });
+      setError(
+        `This ${AEGIS_RUNTIME.postureLabel.toLowerCase()} environment is missing vault or token configuration.`
+      );
+      return;
+    }
+
     if (!withdrawAmount || isNaN(Number(withdrawAmount))) {
+      void trackProductEvent({
+        eventName: "withdrawal_blocked",
+        surface: "vault",
+        metadata: {
+          tokenSymbol: selectedToken.symbol,
+          blockReason: "invalid_amount",
+        },
+      });
       setError("Please enter a valid amount");
       return;
     }
 
     if (Number(withdrawAmount) <= 0) {
+      void trackProductEvent({
+        eventName: "withdrawal_blocked",
+        surface: "vault",
+        metadata: {
+          tokenSymbol: selectedToken.symbol,
+          blockReason: "invalid_amount",
+        },
+      });
       setError("Amount must be greater than 0");
       return;
     }
 
     if (Number(withdrawAmount) > Number(userBalance)) {
+      void trackProductEvent({
+        eventName: "withdrawal_blocked",
+        surface: "vault",
+        metadata: {
+          tokenSymbol: selectedToken.symbol,
+          blockReason: "insufficient_deposited_balance",
+        },
+      });
       setError("Insufficient balance");
       return;
     }
 
     try {
+      void trackProductEvent({
+        eventName: "withdrawal_attempted",
+        surface: "vault",
+        metadata: {
+          tokenSymbol: selectedToken.symbol,
+        },
+      });
+
       const amount = parseUnits(withdrawAmount, selectedToken.decimals);
 
       writeContract({
@@ -83,11 +154,27 @@ export function WithdrawalForm() {
     );
   }
 
+  if (!HAS_CONFIGURED_VAULT || !HAS_CONFIGURED_SUPPORTED_TOKENS || !selectedToken) {
+    return (
+      <div className="aegis-panel p-8 space-y-4 border border-dashed">
+        <div>
+          <h3 className="font-bold text-lg">Environment Configuration Required</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This {AEGIS_RUNTIME.postureLabel.toLowerCase()} runtime needs a vault address and at least one supported token before withdrawals can be enabled.
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Configure `NEXT_PUBLIC_AEGIS_VAULT_ADDRESS` for Paseo, or `NEXT_PUBLIC_MOONBASE_STAGING_VAULT_ADDRESS` plus `NEXT_PUBLIC_MOONBASE_STAGING_TOKEN_ADDRESS` for Moonbase staging.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="aegis-panel overflow-hidden border-indigo-500/20">
       <div className="bg-indigo-600 p-6 text-white">
         <h2 className="text-xl font-bold tracking-tight">Withdraw Assets</h2>
-        <p className="text-sm opacity-80">Retrieve your capital from the yield vault</p>
+        <p className="text-sm opacity-80">Retrieve your capital from the current beta vault</p>
       </div>
       
       <form onSubmit={handleWithdraw} className="p-6 space-y-6">
@@ -140,13 +227,16 @@ export function WithdrawalForm() {
 
         <div className="p-4 rounded-xl bg-indigo-50/50 border border-dashed border-indigo-200 space-y-2">
           <div className="flex justify-between text-xs font-medium">
-            <span className="text-muted-foreground">Withdrawal Fee</span>
+            <span className="text-muted-foreground">Current Beta Fee</span>
             <span className="text-foreground font-bold">0.00%</span>
           </div>
           <div className="flex justify-between text-xs font-medium">
-            <span className="text-muted-foreground">Unlocking Period</span>
-            <span className="text-foreground font-bold">Instant (Paseo)</span>
+            <span className="text-muted-foreground">Current Beta Settlement</span>
+            <span className="text-foreground font-bold">Same transaction</span>
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            These values describe the current {AEGIS_RUNTIME.chainName} contract posture and are not a forward-looking launch fee schedule.
+          </p>
         </div>
 
         {error && (

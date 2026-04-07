@@ -4,26 +4,7 @@ import { ReactNode } from "react";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { injected, mock } from "wagmi/connectors";
-
-const paseoRpcUrl =
-  process.env.NEXT_PUBLIC_PASEO_RPC_URL ??
-  "https://eth-rpc-testnet.polkadot.io";
-
-// Paseo testnet configuration
-const paseoTestnet = {
-  id: 420420417,
-  name: "Paseo Testnet",
-  network: "paseo-testnet",
-  nativeCurrency: {
-    decimals: 18,
-    name: "Paseo",
-    symbol: "PAS",
-  },
-  rpcUrls: {
-    default: { http: [paseoRpcUrl] },
-    public: { http: [paseoRpcUrl] },
-  },
-} as const;
+import { AEGIS_CHAIN, AEGIS_RUNTIME } from "@/lib/runtime/environment";
 
 const isE2EMockWallet =
   process.env.NEXT_PUBLIC_E2E_MOCK_WALLET === "true" ||
@@ -45,10 +26,10 @@ const connectors = isE2EMockWallet
   : [injected()];
 
 const config = createConfig({
-  chains: [paseoTestnet as any],
+  chains: [AEGIS_CHAIN as any],
   connectors,
   transports: {
-    [paseoTestnet.id]: http(paseoRpcUrl),
+    [AEGIS_CHAIN.id]: http(AEGIS_RUNTIME.rpcUrl),
   },
 });
 

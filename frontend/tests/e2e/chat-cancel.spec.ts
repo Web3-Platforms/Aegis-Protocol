@@ -39,9 +39,7 @@ test("canceling a routed chat action does not submit a transaction", async ({ pa
   await page.getByTestId("chat-intent-input").fill("Earn yield on Acala");
   await page.getByTestId("chat-send-button").click();
 
-  await expect(
-    page.getByText("This route passed the risk gate. Confirm if you want to execute the transaction.")
-  ).toBeVisible();
+  await expect(page.getByText(/passed the current prototype risk gate/i)).toBeVisible();
 
   await page.getByTestId("cancel-transaction").click();
 

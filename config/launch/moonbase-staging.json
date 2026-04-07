@@ -1,0 +1,33 @@
+{
+  "profile": "moonbase-staging",
+  "launchMode": "vault_only",
+  "network": {
+    "name": "Moonbase Alpha",
+    "chainId": 1287,
+    "rpcEnv": "RPC_URL"
+  },
+  "vault": {
+    "addressEnv": "AEGIS_VAULT_ADDRESS",
+    "ownerAddressEnv": "AEGIS_OWNER_ADDRESS",
+    "deployerAddressEnv": "AEGIS_DEPLOYER_ADDRESS",
+    "bootstrapOwnerKeyEnv": "BOOTSTRAP_OWNER_PRIVATE_KEY",
+    "requireOwnerContract": true
+  },
+  "operations": {
+    "expectedDepositsPaused": false,
+    "expectedWithdrawalsPaused": false
+  },
+  "frontend": {
+    "experimentalRoutingEnv": "NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING",
+    "expectedExperimentalRouting": false
+  },
+  "tokens": [
+    {
+      "label": "Moonbase staging stable",
+      "addressEnv": "MOONBASE_STAGING_TOKEN_ADDRESS",
+      "symbolEnv": "MOONBASE_STAGING_TOKEN_SYMBOL",
+      "decimals": 6,
+      "smokeTestAmount": "1.0"
+    }
+  ]
+}

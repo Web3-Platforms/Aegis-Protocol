@@ -1,0 +1,6 @@
+"Issue Type","Summary","Description","Priority","Epic Name"
+"Epic","EPIC-1 Product Scope and MVP Readiness","Own MVP scope, feature gating, asset readiness, and product-truth alignment before launch.","Highest","Aegis Product Scope"
+"Epic","EPIC-2 Transaction Engine","Deliver the backend, execution flow, and transaction state handling required for real routed actions.","Highest","Aegis Transaction Engine"
+"Epic","EPIC-3 User Portal and Data Layer","Replace mock-driven analytics and history with live indexed data and wallet-first portfolio views.","Highest","Aegis User Portal"
+"Epic","EPIC-4 QA, Security, and Release Engineering","Create the release, staging, security, and operational controls required for a safe public product.","Highest","Aegis QA Security Release"
+"Epic","EPIC-5 Post-MVP Growth","Track deferred roadmap work including unified auth, identity, and Risk Oracle 2.0.","Medium","Aegis Post-MVP Growth"

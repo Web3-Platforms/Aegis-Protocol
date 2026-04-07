@@ -11,9 +11,11 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: "npm run start -- --hostname 127.0.0.1 --port 3010",
+    command:
+      "NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING=true npm run build && " +
+      "NEXT_PUBLIC_ENABLE_EXPERIMENTAL_ROUTING=true npm run start -- --hostname 127.0.0.1 --port 3010",
     url: "http://127.0.0.1:3010",
-    reuseExistingServer: true,
+    reuseExistingServer: false,
   },
   projects: [
     {

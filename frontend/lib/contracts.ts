@@ -1,13 +1,8 @@
-const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
-
-function resolveAddress(
-  value: string | undefined,
-  fallback: `0x${string}`
-): `0x${string}` {
-  return value && ADDRESS_PATTERN.test(value)
-    ? (value as `0x${string}`)
-    : fallback;
-}
+import {
+  AEGIS_RUNTIME_ENV,
+  isConfiguredAddress,
+  resolveAddress,
+} from "@/lib/runtime/environment";
 
 // Contract configuration for Aegis Vault
 export const AEGIS_VAULT_ABI = [
@@ -208,8 +203,37 @@ export const AEGIS_VAULT_ABI = [
     name: "YieldRoutedViaXCM",
     inputs: [
       { name: "destParachainId", type: "uint32", indexed: true },
+      { name: "token", type: "address", indexed: true },
       { name: "amount", type: "uint256" },
       { name: "riskScore", type: "uint256" },
+      { name: "assetData", type: "bytes" },
+      { name: "timestamp", type: "uint256" },
+    ],
+  },
+  {
+    type: "event",
+    name: "YieldRoutedViaXCMWithAssetType",
+    inputs: [
+      { name: "destParachainId", type: "uint32", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "amount", type: "uint256" },
+      { name: "assetType", type: "uint8", indexed: true },
+      { name: "riskScore", type: "uint256" },
+      { name: "assetData", type: "bytes" },
+      { name: "timestamp", type: "uint256" },
+    ],
+  },
+  {
+    type: "event",
+    name: "XcmRouted",
+    inputs: [
+      { name: "targetChainId", type: "uint32", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "amount", type: "uint256" },
+      { name: "parachainNonce", type: "uint256", indexed: true },
+      { name: "txHash", type: "bytes32" },
+      { name: "riskScore", type: "uint256" },
+      { name: "assetType", type: "uint8" },
       { name: "timestamp", type: "uint256" },
     ],
   },
@@ -259,8 +283,18 @@ export const ERC20_ABI = [
 // Contract addresses are loaded from NEXT_PUBLIC_* env vars for deployment.
 // Fallbacks keep local UI development usable before real Paseo addresses exist.
 export const CONTRACT_ADDRESSES = {
-  AEGIS_VAULT: resolveAddress(
-    process.env.NEXT_PUBLIC_AEGIS_VAULT_ADDRESS,
+  AEGIS_VAULT:
+    AEGIS_RUNTIME_ENV === "moonbase-staging"
+      ? resolveAddress(
+          process.env.NEXT_PUBLIC_MOONBASE_STAGING_VAULT_ADDRESS,
+          "0x0000000000000000000000000000000000000000"
+        )
+      : resolveAddress(
+          process.env.NEXT_PUBLIC_AEGIS_VAULT_ADDRESS,
+          "0x0000000000000000000000000000000000000000"
+        ),
+  MOONBASE_STAGING_VAULT: resolveAddress(
+    process.env.NEXT_PUBLIC_MOONBASE_STAGING_VAULT_ADDRESS,
     "0x0000000000000000000000000000000000000000"
   ),
   // MVP Option A tokens (mock EVM addresses by design)
@@ -273,10 +307,13 @@ export const CONTRACT_ADDRESSES = {
       process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS,
     "0x0000000000000000000000000000000000000000"
   ),
+  MOONBASE_STAGING_TOKEN: resolveAddress(
+    process.env.NEXT_PUBLIC_MOONBASE_STAGING_TOKEN_ADDRESS,
+    "0x0000000000000000000000000000000000000000"
+  ),
 } as const;
 
-// Supported tokens for deposit/withdrawal
-export const SUPPORTED_TOKENS = [
+const PASEO_SUPPORTED_TOKENS = [
   {
     symbol: "wPAS",
     name: "Wrapped PAS",
@@ -292,3 +329,49 @@ export const SUPPORTED_TOKENS = [
     icon: "💳",
   },
 ] as const;
+
+const moonbaseStagingTokenSymbol =
+  process.env.NEXT_PUBLIC_MOONBASE_STAGING_TOKEN_SYMBOL?.trim() || "mUSDC";
+
+const MOONBASE_STAGING_SUPPORTED_TOKENS = isConfiguredAddress(
+  CONTRACT_ADDRESSES.MOONBASE_STAGING_TOKEN
+)
+  ? ([
+      {
+        symbol: moonbaseStagingTokenSymbol,
+        name: `${moonbaseStagingTokenSymbol} (staging stable)`,
+        address: CONTRACT_ADDRESSES.MOONBASE_STAGING_TOKEN,
+        decimals: 6,
+        icon: "🧪",
+      },
+    ] as const)
+  : ([] as const);
+
+export const SUPPORTED_TOKENS: readonly {
+  symbol: string;
+  name: string;
+  address: `0x${string}`;
+  decimals: number;
+  icon: string;
+}[] =
+  AEGIS_RUNTIME_ENV === "moonbase-staging"
+    ? MOONBASE_STAGING_SUPPORTED_TOKENS
+    : PASEO_SUPPORTED_TOKENS;
+
+export type SupportedToken = (typeof SUPPORTED_TOKENS)[number];
+export const HAS_CONFIGURED_VAULT = isConfiguredAddress(
+  CONTRACT_ADDRESSES.AEGIS_VAULT
+);
+export const HAS_CONFIGURED_SUPPORTED_TOKENS = SUPPORTED_TOKENS.length > 0;
+
+export function getSupportedTokenByAddress(
+  address: string | null | undefined
+): SupportedToken | undefined {
+  if (!address) {
+    return undefined;
+  }
+
+  return SUPPORTED_TOKENS.find(
+    (token) => token.address.toLowerCase() === address.toLowerCase()
+  );
+}
