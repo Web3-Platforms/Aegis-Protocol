@@ -9,7 +9,7 @@
     "relay:check-secrets": "node scripts/check-relay-secrets.mjs",
     "lint": "eslint app components lib tests",
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start"
   },
   "keywords": [],
