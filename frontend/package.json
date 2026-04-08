@@ -10,6 +10,7 @@
     "lint": "eslint app components lib tests",
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "[ -n \"$VERCEL\" ] && (rm -rf ../.next && cp -r .next ../.next) || true",
     "start": "next start"
   },
   "keywords": [],
