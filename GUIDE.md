@@ -858,6 +858,29 @@ surface.
 This was a pre-existing bug in `TransactionHistory.tsx` — fixed in this session.
 Run `npm run build` again.
 
+### Vercel build fails — framework not detected or wrong output directory
+If Vercel can't find the Next.js framework or reports the output directory is wrong:
+
+1. In the Vercel project dashboard → **General → Root Directory** → set to `frontend`.
+   This is the preferred path. Vercel then uses `frontend/vercel.json` automatically.
+2. If you cannot change the dashboard setting, the repo root `vercel.json` provides a safe
+   fallback with explicit `installCommand`, `buildCommand`, `outputDirectory`, and security headers.
+3. **Also** ensure `frontend/package-lock.json` pins the Linux native CSS packages (see next entry).
+
+### Railway build fails with missing `lightningcss` or `@tailwindcss/oxide`
+If Railway logs show `Cannot find native binding`, `lightningcss.linux-x64-gnu.node`,
+or `@tailwindcss/oxide-linux-x64-gnu`, the Linux-native CSS toolchain packages
+were not present in the frontend lockfile used by Railway.
+
+Keep these entries in `frontend/package.json` under `optionalDependencies`:
+
+- `lightningcss-linux-x64-gnu`
+- `@tailwindcss/oxide-linux-x64-gnu`
+
+Then regenerate `frontend/package-lock.json`, push, and redeploy. This is an npm
+optional-dependency lockfile issue that can appear when dependency changes are
+made on macOS and later deployed to Railway's Linux environment.
+
 ### Contract tests fail
 Run `cd contracts && npm install` first. `npm test` is the passing prototype
 regression suite, and `npm run gas` profiles the prototype route path
